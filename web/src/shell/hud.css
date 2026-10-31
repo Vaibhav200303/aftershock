@@ -1,5 +1,5 @@
 /* Sunlit village HUD: warm parchment, timber-colored rules and river-teal actions. */
-:root { --hud-paper:#fff8e7; --hud-ink:#29483e; --hud-rule:#d6c9a5; --hud-teal:#286c60; --hud-gold:#b88732; }
+:root { --hud-scrim:rgba(18,40,38,.28); --hud-paper:#fff8e7; --hud-ink:#29483e; --hud-rule:#d6c9a5; --hud-teal:#286c60; --hud-gold:#b88732; }
 .hud-chain { background:var(--hud-paper) !important; border:1px solid var(--hud-rule) !important; border-radius:14px !important; color:var(--hud-ink) !important; box-shadow:0 8px 24px #315d6120; padding:14px 16px !important; }
 .hud-chain > div { border-color:var(--hud-rule) !important; }
 .hud-dock { background:var(--hud-paper) !important; border:1px solid var(--hud-rule); border-radius:14px; margin:0 16px 16px; padding:12px 14px !important; gap:10px !important; box-shadow:0 8px 24px #315d6126; }

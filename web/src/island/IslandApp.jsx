@@ -656,7 +656,7 @@ export default class IslandApp extends React.Component {
         {/* The place card: the big one, flat in the place's own colour, holding the lineup. */}
         {v.selected && (
           <div onClick={v.closeLoc}
-               style={S(`position: absolute; inset: 0; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 26px 22px; z-index: 40; animation: ${v.closing ? "veilout .2s ease both" : "veilin .24s ease both"};`)}>
+               style={S(`position: absolute; inset: 0; background: var(--hud-scrim, rgba(18,40,38,.28)); display: grid; place-items: center; padding: 26px 22px; z-index: 40; animation: ${v.closing ? "veilout .2s ease both" : "veilin .24s ease both"};`)}>
             <div className="hud-location" onClick={e => e.stopPropagation()}
                  style={S(`width: 100%; max-width: 1240px; height: 100%; max-height: 820px; border-radius: 12px; overflow: hidden; background: ${v.selected.color}; box-shadow: 0 24px 60px rgba(0,0,0,.5); color: #fff; display: flex; flex-direction: column; animation: ${v.closing ? "cardout .2s ease both" : "cardin .3s cubic-bezier(.2,.7,.2,1) both"};`)}>
               <div style={S("flex: none; display: flex; align-items: center; gap: 14px; padding: 16px 20px 14px;")}>

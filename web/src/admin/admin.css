@@ -276,3 +276,7 @@ body #admin-root .dashboard-empty p { max-width: 520px; margin: 12px auto 0; col
   body #admin-root .chart { padding: 14px; }
   body #admin-root .tile .lab { white-space: normal; }
 }
+
+/* Let the drawer and its scrim sit above the live island inset as well. */
+body.view-admin #admin-root.dials-open { z-index: auto; }
+body #admin-root #dials-backdrop { position:fixed; inset:0; z-index:50; padding:0; border:0; border-radius:0; background:var(--hud-scrim,rgba(18,40,38,.28)); cursor:default; }

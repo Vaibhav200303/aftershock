@@ -26,6 +26,7 @@ export default function AgentInspector(){
  const agents=snapshot?.agents||[],persona=agent?bodyOf(agent.id):null;
  const stats=(items)=><dl className="ai-stats">{items.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{number(value)}</dd></div>)}</dl>;
  return <><button className="ai-launch" onClick={()=>{setSelected(null);setOpen(true);}}>Agents <span>{agents.length}</span></button>
+ {open&&<button className="ai-backdrop" tabIndex={-1} aria-label="Dismiss agent profile" onClick={()=>setOpen(false)}/>}
  {open&&<aside className="agent-inspector" role="dialog" aria-label={agent?`${agent.name} agent profile`:'Village agents'}>
  <header><div><h2>{agent?'Agent profile':'Village agents'}</h2><p>Meet the minds behind the village</p></div><button ref={closeRef} onClick={()=>setOpen(false)} aria-label="Close agent profile">×</button></header>
  <div className="ai-scroll">

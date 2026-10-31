@@ -121,6 +121,7 @@ const MARKUP = `
   ${[['overview','Overview'],['economy','Economy'],['villagers','Villagers'],['activity','Activity']].map(([id,label]) => `<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${id === 'overview'}" tabindex="${id === 'overview' ? 0 : -1}" data-tab="${id}">${label}</button>`).join('')}
 </nav>
 <div id="dashboard-empty" class="dashboard-empty"><span class="dashboard-eyebrow">YOUR ISLAND IS READY</span><h2>Bring the village to life</h2><p>Choose your villagers and press Start. Production, prices, and wellbeing will appear here as the rounds unfold.</p></div>
+<button id="dials-backdrop" aria-label="Dismiss Dials" tabindex="-1" onclick="dash.toggleDials()" hidden></button>
 <div id="admin-panel" inert>
   <button class="close" onclick="dash.toggleDials()">Close</button>
   <h2>Dials</h2>
@@ -706,7 +707,11 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function toggleDials() {
   const open = $('admin-panel').classList.toggle('open');
   $('admin-panel').inert = !open;
+  $('dials-backdrop').hidden = !open;
+  $('dialsbtn').setAttribute('aria-expanded', String(open));
+  if (!open) $('dialsbtn').focus();
   root.classList.toggle('dials-open', open);
+  if (open) $('admin-panel').querySelector('.close').focus();
   if (open && !dials) loadDials();
 }
 
@@ -888,6 +893,13 @@ export function mountAdmin(el) {
   $('tiles').innerHTML = TILES.map(t => `<button type="button" class="tile" id="t-${t.id}" aria-expanded="false" aria-controls="tile-open" title="Open ${t.label} chart"></button>`).join('');
   TILES.forEach(t => { $('t-' + t.id).onclick = () => { openTile = openTile === t.id ? null : t.id; tiles(); }; });
   $('more').addEventListener('toggle', () => { if (last?.running && visible) { details(); econ(); } });
+  $('dialsbtn').setAttribute('aria-expanded', 'false');
+  $('dialsbtn').setAttribute('aria-controls', 'admin-panel');
+  root.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && root.classList.contains('dials-open')) {
+      event.stopPropagation(); toggleDials();
+    }
+  });
   $('agents').addEventListener('input', () => { agentsTouched = true; });
   root.querySelectorAll('[data-tab]').forEach(button => {
     button.addEventListener('click', () => selectTab(button.dataset.tab));
