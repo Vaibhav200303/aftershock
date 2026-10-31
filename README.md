@@ -33,6 +33,12 @@ season, a cold snap, a credit crunch, and so on.
 - **Run analysis.** Every run is logged under `runs/`, and scripts summarise, compare
   and trace runs after the fact.
 
+## Persistent islands and shared disaster experience
+
+Open **Village archive** from either view to switch between Sunhaven and Moonharbor, review measured council observations, compare runs, and choose a memory-on/off disaster experiment. Approved observations are supplied to model agents and shown in their inspector with source evidence.
+
+YugabyteDB stores run/checkpoint history, and Meko stores approved public disaster memories. Both have explicit connection status and a durable local fallback; configure server-only credentials using `.env.example`. One island simulation runs at a time. See [persistent islands and memory](docs/design/persistent-islands.md) for setup, tests, settlement boundaries and restart behavior.
+
 ## How it fits together
 
 ```

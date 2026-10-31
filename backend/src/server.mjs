@@ -1,3 +1,6 @@
+import {randomUUID,createHash} from 'node:crypto';
+import {store,meko,academy,ISLANDS,SCENARIOS,islandById,startupConfig} from './persistence/services.mjs';
+import {activeShocks,comparison} from './memory/academy.mjs';
 // Runs the village and serves a dashboard.
 //   GET  /        island view          GET /state   JSON snapshot
 //   GET  /dashboard  the dashboard
@@ -15,7 +18,7 @@ import { makeTools, toolDefs } from './tools.mjs';
 import { stubBrain } from './brains/stub.mjs';
 import { providerNames, providerBrain, modelFor, missing, setRuntimeKey, clearRuntimeKeys, hasEnvKey, checkKey } from './brains/providers.mjs';
 import { systemPrompt } from './brains/prompt.mjs';
-import { snapshot as tunableSnapshot, apply as applyTunables, preset as presetChanges, REV } from './tunables.mjs';
+import { snapshot as tunableSnapshot, apply as applyTunables, preset as presetChanges, REV, DEFAULTS } from './tunables.mjs';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -105,6 +108,7 @@ let gen = 0;
 const sseClients = new Set();
 
 function broadcast(e) {
+  e.islandId = sim?.islandId || 'day';
   const line = `data: ${JSON.stringify(e)}\n\n`;
   for (const res of sseClients) res.write(line);
   sim?.log.write(JSON.stringify(e) + '\n');
@@ -163,7 +167,18 @@ async function start(opts = {}) {
   catch (e) { console.error(`start failed: ${e.message ?? e}`); clearRuntimeKeys(); if (MANAGED) { openChain?.close(); stopValidator(); } return { error: String(e.message ?? e).slice(0, 300) }; }
   finally { starting = false; }
 }
-async function begin({ provider: choice, model, agents, apiKey } = {}) {
+async function begin({ provider: choice, model, agents, apiKey, islandId='day', memoryEnabled=true, scenario='free', seed } = {}) {
+  if(!ISLANDS.some(i=>i.id===islandId)||!SCENARIOS[scenario]) return {error:'Unknown island or scenario'};
+  if(seed!=null&&(!Number.isInteger(+seed)||+seed<0||+seed>2147483647))return {error:'Seed must be an integer from 0 to 2147483647'};
+  agents = agents ?? store.latest(islandId)?.snapshot.agents?.length ?? CFG.AGENTS;
+  Object.assign(CFG,structuredClone(startupConfig));
+  const originalDials=Object.fromEntries(tunableSnapshot().tunables.map(t=>[t.key,t.dflt]));
+  const profile=islandById(islandId).profile;
+  for(const [key,value] of Object.entries(profile)){let obj=CFG;const parts=key.split('.');for(const k of parts.slice(0,-1))obj=obj[k];obj[parts.at(-1)]=value;}
+  for(const [key,value] of Object.entries(originalDials)) DEFAULTS[key]=profile[key]??value;
+  if(seed!=null)CFG.SEED=+seed;
+  if(Object.keys(BIRTH_DIALS).length)applyTunables(BIRTH_DIALS);
+
   if (HOSTED && choice && !offered().includes(choice)) return { error: 'That provider is not offered here.' };
   const pick = offered().includes(choice) ? choice : CFG.PROVIDER;
   // A pasted key: held in memory for this run (providers.mjs), checked with the provider
@@ -234,12 +249,14 @@ async function begin({ provider: choice, model, agents, apiKey } = {}) {
     mint: chain.mint.toBase58(), vault: chain.vault.toBase58(),
     config: { ...CFG, RPC: undefined },
     dials: BIRTH_DIALS,             // DIALS=… : what was moved off the defaults before the village was born
-    agents: W.agents.map(a => ({ id: a.id, name: a.name, skills: a.skills, traits: a.traits })),
+    agents: W.agents.map(a => ({ id: a.id, name: a.name, memoryEvidence: a.memoryEvidence||null, skills: a.skills, traits: a.traits })),
   }, null, 2));
   finished = null;
-  sim = { W, chain, brain, controllers: new Set(), gen: myGen, startedAt: Date.now(), dir, sigs: new Map(), agentLog: new Map(),
+  sim = { W, chain, brain, id: randomUUID(), islandId, memoryEnabled: memoryEnabled !== false, scenario, controllers: new Set(), gen: myGen, startedAt: Date.now(), dir, sigs: new Map(), agentLog: new Map(),
           paused: false, pausing: false, resumeClock: null,
           log: fs.createWriteStream(path.join(dir, 'events.jsonl')) };
+  sim.record = {id:sim.id,islandId,seed:CFG.SEED,memoryEnabled:sim.memoryEnabled,scenario,conditions:[],metrics:{hungry:0,cold:0},matchKey:createHash('sha256').update(JSON.stringify({islandId,seed:CFG.SEED,agents:CFG.AGENTS,provider:brain.name,scenario,profile,initialDials:tunableSnapshot().tunables.filter(t=>t.live).map(t=>[t.key,t.value])})).digest('hex')};
+  await saveCheckpoint();
   console.log(`logging to ${path.relative(ROOT, dir)}/`);
   console.log(`\nstarted   provider=${brain.name}   agents=${CFG.AGENTS}   ledger ${chain.ledger.publicKey.toBase58()}`);
   console.log(`SETTLERS  ${chain.mint.toBase58()}   (mint authority: itself — no key for it exists)`);
@@ -262,7 +279,7 @@ async function begin({ provider: choice, model, agents, apiKey } = {}) {
     const jobValues = W.jobValues(a).map(j => ({ task: j.task, raw: Math.round(j.raw), sure: Math.round(j.sure), can: j.can }));
     let timer;
     const outcome = await Promise.race([
-      Promise.resolve().then(() => brain.decide(a, tools)).then(() => 'ok', e => { W.emit('error', { agent: a.id, message: e.message }); return 'error'; }),
+      Promise.resolve().then(() => { a.memoryEvidence = owner.recall || {mode:'disabled',items:[]}; tools.memoryContext = academy.context(a.memoryEvidence); return brain.decide(a, tools); }).then(() => 'ok', e => { W.emit('error', { agent: a.id, message: e.message }); return 'error'; }),
       new Promise(r => { timer = setTimeout(() => r('timeout'), CFG.DECIDE_TIMEOUT_MS); }),
       quorum.reached.then(() => 'straggler'),
     ]);
@@ -333,6 +350,10 @@ async function begin({ provider: choice, model, agents, apiKey } = {}) {
     while (alive()) {
       await waitIfPaused();
       if (!alive()) return;
+      const scenarioStep=SCENARIOS[sim.scenario].schedule.find(step=>step.round===W.round+1);
+      if(scenarioStep)setTunables({preset:scenarioStep.preset});
+      sim.recall=await academy.recall(sim.islandId,activeShocks(tunableSnapshot()),sim.memoryEnabled);
+      if(!alive())return;
       logPrompt();
       const t0 = Date.now();
       const quorum = makeQuorum(W.agents.length);
@@ -350,6 +371,10 @@ async function begin({ provider: choice, model, agents, apiKey } = {}) {
                           quorum: CFG.DECIDE_QUORUM, quorumNeed: quorum.need,
                           quorumMs: quorum.closedAt() ? quorum.closedAt() - t0 : null,
                           stragglers: res.filter(r => r.straggler).length });
+      await academy.observe(sim.record,state(),tunableSnapshot());
+      await saveCheckpoint();
+      const cap=MAX_ROUNDS||SCENARIOS[sim.scenario].limit;
+      if(cap&&W.round>=cap){setTimeout(()=>stop('limit').catch(()=>{}),0);return;}
       await waitIfPaused();
     }
   }
@@ -387,8 +412,10 @@ async function finishStop(s, reason) {
   for (const controller of s.controllers) controller.abort();
   s.resumeClock?.();               // a paused clock must wake up so it can observe stopping
   await s.clock;                  // the round in progress finishes; a decision phase in progress is dropped
+  await academy.observe(s.record,state(),tunableSnapshot(),true);
   finished = { snapshot: structuredClone({ ...state(), running: false, completed: true, paused: false, pausing: false, endReason: reason, endedAt: new Date().toISOString() }),
     agents: new Map(s.W.agents.map(a => [a.id, structuredClone({ id: a.id, name: a.name, model: a.model ?? null, traits: a.traits, decisions: s.agentLog.get(a.id) ?? [], journal: a.journal })])) };
+  await saveCheckpoint(finished.snapshot);
   try {
   const L = await s.chain.fetch();
   fs.writeFileSync(path.join(s.dir, 'final.json'), JSON.stringify({
@@ -419,6 +446,7 @@ function state() {
   const doing = {};
   for (const a of W.agents) { const k = a.activity?.task ?? 'deciding'; doing[k] = (doing[k] ?? 0) + 1; }
   return {
+    runId:sim.id,islandId:sim.islandId,memoryEnabled:sim.memoryEnabled,scenario:sim.scenario,
     running: true, paused: sim.paused, pausing: sim.pausing, provider: brain.name, providers: offered(),
     hosted: HOSTED, starting, maxRounds: MAX_ROUNDS, keys: Object.fromEntries(providerNames().filter(n => n !== 'stub').map(n => [n, hasEnvKey(n)])),
     config: { agents: CFG.AGENTS, maxAgents: MAX_AGENTS, provider: CFG.PROVIDER, model: modelFor(CFG.PROVIDER), decideTimeoutMs: CFG.DECIDE_TIMEOUT_MS, decideQuorum: CFG.DECIDE_QUORUM },
@@ -450,7 +478,7 @@ function state() {
              transactions: chain.txCount(), lastRound: W.lastRound },
     llm: brain.stats(),
     agents: W.agents.map(a => ({
-      id: a.id, name: a.name, skills: Object.fromEntries(Object.entries(a.skills).map(([k, v]) => [k, +v.toFixed(2)])), cash: a.cash / 100,
+      id: a.id, name: a.name, memoryEvidence: a.memoryEvidence||null, skills: Object.fromEntries(Object.entries(a.skills).map(([k, v]) => [k, +v.toFixed(2)])), cash: a.cash / 100,
       food: a.goods[0], wood: a.goods[1], nets: a.goods[2], smoked: a.goods[3], houses: W.houses(a), house: W.hasHouse(a),
       // a build in progress: shifts worked, out of what it takes this agent (crafting skill sets that)
       building: a.building?.shifts ?? null, buildShifts: (a.building?.shifts ?? 0) + W.buildShiftsLeft(a),
@@ -571,24 +599,48 @@ function serveFrontend(res, pathname) {
   return serveFile(res, file);
 }
 
+function detailsFor(s=sim){return s.W.agents.map(a=>({id:a.id,name:a.name,model:a.model??null,traits:a.traits,decisions:s.agentLog.get(a.id)??[],journal:a.journal,memoryEvidence:a.memoryEvidence||null}));}
+async function saveCheckpoint(snapshot=state()){
+ if(!sim)return;const record={...sim.record,status:snapshot.completed?'completed':'running',snapshot:structuredClone(snapshot),agentDetails:detailsFor(),dials:tunableSnapshot()};
+ await store.save('run',record);
+}
+function savedState(record){return {...record.snapshot,running:false,paused:false,pausing:false,completed:true,recovered:true,endReason:record.snapshot.endReason||'interrupted',endedAt:record.snapshot.endedAt||record.updatedAt};}
+function stateFor(islandId){
+ if(sim?.islandId===islandId)return state();
+ if(finished?.snapshot.islandId===islandId)return finished.snapshot;
+ const record=store.latest(islandId);if(record)return savedState(record);
+ return {running:false,starting,providers:offered(),keys:Object.fromEntries(providerNames().filter(n=>n!=='stub').map(n=>[n,hasEnvKey(n)])),islandId,config:{agents:CFG.AGENTS,provider:CFG.PROVIDER,model:modelFor(CFG.PROVIDER),maxAgents:MAX_AGENTS},maxRounds:MAX_ROUNDS};
+}
+function decorate(s,islandId){return {...s,islandId,island:islandById(islandId),islands:ISLANDS,activeIsland:sim?.islandId||null,persistence:store.health,memoryService:{...meko.health,datapackConfigured:!!meko.datapacks[islandId]},maxRounds:MAX_ROUNDS||SCENARIOS[s.scenario||'free'].limit};}
 const server = http.createServer(async (req, res) => {
   try {
-    const pathname = new URL(req.url, 'http://localhost').pathname;
-    if (pathname === '/state') return json(res, state());
+    const url=new URL(req.url,'http://localhost');
+    const pathname=url.pathname;
+    const islandId=String(req.headers['x-island-id']||url.searchParams.get('island')||'day');
+    if(!ISLANDS.some(i=>i.id===islandId))return json(res,{error:'Unknown island'},400);
+    if(pathname==='/state')return json(res,decorate(stateFor(islandId),islandId));
+    if(pathname==='/learning'&&req.method==='GET')return json(res,{lessons:store.listLessons(islandId),runs:comparison(store.listRuns(islandId).slice(0,30)),storage:store.health,memory:{...meko.health,datapackConfigured:!!meko.datapacks[islandId]},scenarios:SCENARIOS});
+    if(pathname==='/learning/review'&&req.method==='POST'){const body=await readBody(req);try{return json(res,await academy.review(body.id,islandId,body.action));}catch{return json(res,{error:'Could not review this lesson. Check its island and review action.'},400);}}
+    if(pathname==='/runs'&&req.method==='GET')return json(res,comparison(store.listRuns(islandId)));
+    if(pathname==='/runs/detail'&&req.method==='GET'){const r=store.runs.get(url.searchParams.get('id'));if(!r||r.islandId!==islandId)return json(res,{error:'Run not found'},404);return json(res,{...r,snapshot:decorate(savedState(r),islandId)});}
+    if(req.method==='POST'&&['/stop','/pause','/resume','/tunables'].includes(pathname)&&sim&&sim.islandId!==islandId)return json(res,{error:'This island is not active. Switch to the running island to control it.'},409);
+
     // one villager's whole run: every decision it made and every line it was told, oldest first
     if (pathname === '/agent' && req.method === 'GET') {
       const id = +new URL(req.url, 'http://localhost').searchParams.get('id');
+      if(sim?.islandId!==islandId){const detail=store.latest(islandId)?.agentDetails.find(a=>a.id===id);return detail?json(res,detail):json(res,{error:'No saved villager'},404);}
       if (!sim && finished?.agents.has(id)) return json(res, finished.agents.get(id));
       const a = sim?.W.agents.find(x => x.id === id);
       if (!a) return json(res, { error: 'no such agent' }, 404);
       return json(res, { id: a.id, name: a.name, model: a.model ?? null, traits: a.traits,
                          decisions: sim.agentLog.get(a.id) ?? [], journal: a.journal });
     }
-    if (pathname === '/tunables' && req.method === 'GET')  return json(res, tunableSnapshot());
+    if (pathname === '/tunables' && req.method === 'GET') return json(res,sim&&sim.islandId===islandId?tunableSnapshot():store.latest(islandId)?.dials||tunableSnapshot());
     if (pathname === '/tunables' && req.method === 'POST') return json(res, setTunables(await readBody(req)));
     // { provider: "deepinfra", agents: 30 } sets up the run; no body means what .env says
     if (pathname === '/start'  && req.method === 'POST') {
-      const r = await start(await readBody(req));
+      if(sim&&sim.islandId!==islandId)return json(res,{error:'Stop the active island before starting another economy.'},409);
+      const r = await start({...await readBody(req),islandId});
       return r?.error ? json(res, r, 400) : json(res, { result: r });
     }
     if (pathname === '/stop'   && req.method === 'POST') return json(res, { result: await stop() });
@@ -637,7 +689,7 @@ function listen(port = CFG.PORT) {
 }
 listen();
 // the hosted cap: a run that reaches MAX_ROUNDS stops itself
-if (MAX_ROUNDS) setInterval(() => { if (sim && !sim.stopping && sim.W.round >= MAX_ROUNDS) stop('limit').catch(e => console.error(`auto-stop: ${e.message}`)); }, 1000).unref();
+setInterval(() => { if (sim && !sim.stopping && (MAX_ROUNDS||SCENARIOS[sim.scenario].limit)>0 && sim.W.round >= (MAX_ROUNDS||SCENARIOS[sim.scenario].limit)) stop('limit').catch(e => console.error(`auto-stop: ${e.message}`)); }, 1000).unref();
 
 // ---- headless mode: RUN_SECONDS=45 or RUN_ROUNDS=100 starts immediately, prints a summary, exits ---
 // A round cap is what makes two runs comparable: by the clock, a slower model plays fewer rounds.

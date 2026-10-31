@@ -1,9 +1,10 @@
+import {NIGHT} from '../world/theme.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // One sun direction is shared by the visible sky, cloud shading, water and town shadows.
-export const SUN_DIRECTION = new THREE.Vector3(-90, 130, 70).normalize();
-export const DAYLIGHT = { horizon:0x9bc9e3, zenith:0x4c9bd0, sea:0x258da9 };
+export const SUN_DIRECTION = (NIGHT?new THREE.Vector3(-220,115,-340):new THREE.Vector3(-90,130,70)).normalize();
+export const DAYLIGHT = NIGHT ? {horizon:0x263e68,zenith:0x101b40,sea:0x173e61} : { horizon:0x9bc9e3, zenith:0x4c9bd0, sea:0x258da9 };
 
 export function addDaylight(scene) {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(5000,32,20),new THREE.ShaderMaterial({
@@ -16,16 +17,17 @@ export function addDaylight(scene) {
         vec3 dir=normalize(vDirection);
         vec3 col=mix(uHorizon,uZenith,smoothstep(0.0,0.8,dir.y));
         float alignment=max(dot(dir,uSun),0.0);
-        col=mix(col,vec3(1.0,0.91,0.67),pow(alignment,24.0)*0.22);
-        col=mix(col,vec3(1.0,0.97,0.78),smoothstep(0.99945,0.9998,alignment));
+        col=mix(col,${NIGHT?'vec3(0.6,0.72,1.0)':'vec3(1.0,0.91,0.67)'},pow(alignment,24.0)*0.22);
+        col=mix(col,${NIGHT?'vec3(0.86,0.92,1.0)':'vec3(1.0,0.97,0.78)'},${NIGHT?'0.0':'smoothstep(0.99945,0.9998,alignment)'});
         gl_FragColor=vec4(col,1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`
   }));
   sky.renderOrder=-10;scene.add(sky);
+  if(NIGHT){const moon=new THREE.Mesh(new THREE.SphereGeometry(11,20,16),new THREE.MeshBasicMaterial({color:0xdde8ff}));moon.position.set(-220,115,-340);scene.add(moon);}
   // Puffy, sculpted cloud silhouettes. Their undersides receive sky bounce, never a second sun.
-  const cloudMaterial=new THREE.MeshStandardMaterial({color:0xfffdf3,roughness:1});
+  const cloudMaterial=new THREE.MeshStandardMaterial({color:NIGHT?0x677593:0xfffdf3,roughness:1});
   const clouds=[];
   const positions=[[-102,-83,21,0.85],[-26,-137,24,1.1],[73,-116,19,0.8],[147,-39,22,1.05],
     [150,108,20,0.75],[32,176,23,0.9],[-124,146,20,1],[-153,22,24,0.8]];

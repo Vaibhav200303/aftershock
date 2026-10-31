@@ -810,15 +810,15 @@ async function toggle() {
   if (last?.completed && !confirm('Start a new village? This replaces the displayed results. The previous run remains saved.')) return;
   btn.disabled = true;
   statusEl.textContent = running ? 'stopping' : 'starting, creating the ledger on Solana';
-  const n = Math.round(+$('agents').value);
-  // the provider is chosen for the run that is starting; a run already going keeps its own.
-  // JSON.stringify drops the undefined keys, so a stop still posts {} and an untouched
-  // field still means "whatever .env says".
-  const body = running ? {} : { provider: $('providersel').value || undefined, agents: n > 0 ? n : undefined };
-  await fetch(running ? '/stop' : '/start', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body) });
-  btn.disabled = false;
-  refreshState();
+  try {
+    const n = Math.round(+$('agents').value);
+    const body = running ? {} : { provider: $('providersel').value || undefined, agents: n > 0 ? n : undefined };
+    const response = await fetch(running ? '/stop' : '/start', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const result = await response.json();
+    if (!response.ok || result.error) throw new Error(result.error || 'Could not update the village.');
+    await refreshState();
+  } catch (error) { statusEl.textContent = error.message; }
+  finally { btn.disabled = false; }
 }
 
 // Pick the provider for the next run: .env's choice is the default, and the picker is only

@@ -21,8 +21,8 @@ export default function AgentInspector(){
  const agent=snapshot?.agents?.find(a=>a.id===selected);
  useEffect(()=>{if(!open||selected==null||!agent){setDetail(null);return;}const controller=new AbortController();setError('');setLoading(true);
  fetch(`/agent?id=${encodeURIComponent(selected)}`,{signal:controller.signal}).then(async r=>{if(!r.ok)throw Error('Could not load this agent’s history.');return r.json();}).then(d=>setDetail(d)).catch(e=>{if(e.name!=='AbortError')setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
- return()=>controller.abort();},[selected,open,snapshot?.round,snapshot?.running,retry,!!agent]);
- useEffect(()=>setDetail(null),[selected]);
+ return()=>controller.abort();},[selected,open,snapshot?.round,snapshot?.running,snapshot?.runId,retry,!!agent]);
+ useEffect(()=>setDetail(null),[selected,snapshot?.runId]);
  const agents=snapshot?.agents||[],persona=agent?bodyOf(agent.id):null;
  const stats=(items)=><dl className="ai-stats">{items.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{number(value)}</dd></div>)}</dl>;
  return <><button className="ai-launch" onClick={()=>{setSelected(null);setOpen(true);}}>Agents <span>{agents.length}</span></button>
@@ -38,6 +38,7 @@ export default function AgentInspector(){
  <section><h3>Personality</h3><p className="ai-note">Behavioral traits from this simulation.</p>{detail?.traits?Object.entries(detail.traits).map(([k,v])=><label className="ai-trait" key={k}><span>{words(k)}</span><meter min="0" max="1" value={v} aria-label={words(k)}/><b>{Math.round(v*100)}%</b></label>):<p>{loading?'Loading traits…':'Traits are unavailable.'}</p>}</section>
  <section><h3>Resources & finances</h3>{stats([['Coins',agent.cash],['Debt',agent.debt],['Due in rounds',agent.dueIn],['Food',agent.food],['Wood',agent.wood],['Nets',agent.nets],['Smoked fish',agent.smoked],['Houses',agent.houses],['Build progress',agent.building],['Build shifts',agent.buildShifts]])}</section>
  <section><h3>Skills</h3><dl className="ai-skills">{Object.entries(agent.skills||{}).map(([k,v])=><div key={k}><dt>{words(k)}</dt><dd>{number(v)}×</dd></div>)}</dl></section>
+ <section><h3>Remembered experience</h3><p className="ai-note">{agent.memoryEvidence?.mode||'No recalled experience in this turn.'}</p>{agent.memoryEvidence?.items?.map(m=><div className="ai-memory-evidence" key={m.id}><p>{m.text}</p><small>Source run {m.runId} · rounds {m.startRound}–{m.endRound} · {m.role}</small></div>)}<p className="ai-note">These are the observations supplied before this turn, not proof that they caused the selected action.</p></section>
  <section><h3>Latest thought</h3><blockquote>{agent.thought||'No thought recorded yet.'}</blockquote></section>
  <section><h3>Open orders</h3>{agent.orders?.length?<ul>{agent.orders.map((o,i)=><li key={i}>{typeof o==='string'?o:JSON.stringify(o)}</li>)}</ul>:<p>No open orders.</p>}</section>
  {loading&&<p role="status">Updating history…</p>}{error&&<p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>Retry</button></p>}

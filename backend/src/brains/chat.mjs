@@ -168,7 +168,7 @@ export function chatBrain({ label, client, pickModel, price = () => [0, 0], para
       m.agents.add(a.id);
       const bump = (k, n = 1) => { s[k] += n; m[k] += n; };
 
-      const talk = wire.start(systemPrompt(), t.observe());
+      const talk = wire.start(systemPrompt(), t.observe() + (t.memoryContext || ''));
 
       for (let turn = 0; turn < 3; turn++) {
         let r;

@@ -5,11 +5,14 @@
   "scripts": {
     "start": "node src/server.mjs",
     "stub": "PROVIDER=stub node src/server.mjs",
-    "check-brain": "node scripts/check-brain.mjs"
+    "check-brain": "node scripts/check-brain.mjs",
+    "test": "node --test tests/academy.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@solana/web3.js": "^1.99.0",
-    "openai": "^7.19.0"
+    "openai": "^7.19.0",
+    "pg": "^8.23.1"
   }
 }

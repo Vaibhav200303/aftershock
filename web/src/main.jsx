@@ -3,6 +3,9 @@
 // into the corner as a live security camera, and clicking it expands it back out. The 3D
 // scene, its walk animation and the shared /events stream survive every switch.
 import React from 'react';
+import WorldHub from './world/WorldHub.jsx';
+import {installIslandRouting} from './world/api.js';
+installIslandRouting();
 import { createRoot } from 'react-dom/client';
 import './shell/shell.css';
 import './shell/hud.css';
@@ -100,8 +103,8 @@ function syncLowPower() {
 }
 
 function go(next, { replace = false } = {}) {
-  const path = next === 'admin' ? ADMIN_PATH : '/';
-  if (location.pathname !== path) {
+  const path = (next === 'admin' ? ADMIN_PATH : '/') + location.search;
+  if (location.pathname + location.search !== path) {
     if (replace) history.replaceState({ view: next }, '', path);
     else history.pushState({ view: next }, '', path);
   }
@@ -122,6 +125,7 @@ frame.addEventListener('click', () => go('island'));
 
 // ---- mount ------------------------------------------------------------------------
 mountAdmin(adminRoot);
+const worldRoot=document.createElement('div');document.body.appendChild(worldRoot);createRoot(worldRoot).render(<WorldHub/>);
 mountKeyGate(document.body);         // the front door, where the server holds no API key
 createRoot(document.getElementById('island-root')).render(
   <IslandApp ref={islandRef} onAdmin={() => go('admin')} />,

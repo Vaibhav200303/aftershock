@@ -1,3 +1,4 @@
+import {NIGHT} from '../world/theme.js';
 // <island-3d> — ported from frontend/island3d.js, unchanged except for four things:
 //   * three is a real dependency now (`import * as THREE`) instead of a CDN dynamic import,
 //   * the element reads the shared /state store instead of polling and opening its own SSE,
@@ -56,12 +57,12 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
   // the raw landscape, with no road graded into it. ROAD is laid out on this field; height()
   // below is the same field with the road's corridor levelled, and is what everything draws on.
   function baseHeight(x, z) {
-    const d = Math.hypot(x, z);
+    const d = Math.hypot(x*(NIGHT?1.04:1), z*(NIGHT?.93:1));
     const ang = Math.atan2(z, x);
     const coast = fbm(Math.cos(ang) * 1.9 + 5, Math.sin(ang) * 1.9 + 9, 4);
     const R = 72 + coast * 22;
     // A broad playable meadow with a sculpted cliff shelf, rather than a volcano.
-    const meadow = 7.5 + fbm(x * 0.025 + 11, z * 0.025 + 7, 3) * 1.8;
+    const meadow = (NIGHT?5.8+Math.floor((x+85)/35)*1.1:7.5) + fbm(x * 0.025 + 11, z * 0.025 + 7, 3) * 1.8;
     return meadow * (1 - sstep(R - 15, R - 6, d))
       + 1.6 * sstep(R - 15, R - 6, d) * (1 - sstep(R - 4, R + 5, d))
       - 20 * sstep(R, R + 46, d);
@@ -370,7 +371,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       renderer.domElement.style.height = "100%";
       renderer.domElement.style.display = "block";
 
-      this.hemi = new THREE.HemisphereLight(0xc5e5fa, 0xa9a07b, 0.95);
+      this.hemi = new THREE.HemisphereLight(NIGHT?0x8ba9e0:0xc5e5fa, NIGHT?0x4b5571:0xa9a07b, NIGHT?.95:.95);
       scene.add(this.hemi);
       const sun = new THREE.DirectionalLight(0xffe6bb, 2.35);
       sun.position.copy(SUN_DIRECTION).multiplyScalar(175);
@@ -530,9 +531,9 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         uHeight: { value: hTex },
         uSize: { value: SIZE },
         uSun: { value: SUN_DIRECTION.clone() },
-        uDeep: { value: new THREE.Color(0x087f9f) },
-        uMid: { value: new THREE.Color(0x20b3bd) },
-        uShallow: { value: new THREE.Color(0x71d4bc) },
+        uDeep: { value: new THREE.Color(NIGHT?0x143859:0x087f9f) },
+        uMid: { value: new THREE.Color(NIGHT?0x24637d:0x20b3bd) },
+        uShallow: { value: new THREE.Color(NIGHT?0x4a939e:0x71d4bc) },
         uFoam: { value: new THREE.Color(0xf2fbff) },
         uCam: { value: new THREE.Vector3() },
         // Ocean and sky share a pale atmospheric horizon in the same color space.
@@ -864,7 +865,8 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
 
     /** /state: the truth, for first load, reconnection and drift — never a starting gun. */
     apply(s) {
-      if (!s) return;                                    // server down: keep the last picture
+      if (!s) return;
+      if (this.runId !== s.runId) { this.blobs.clear(); this.round = null; this.runId=s.runId; this.syncBlobs(); } // server down: keep the last picture
       this.completed = !!s.completed;
       if (!s.running && !s.completed) { this.blobs.clear(); this.round = null; this.syncBlobs(); return; }
       setPopulation(s.agents?.length);
@@ -1226,7 +1228,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       }
       this.daylight?.update(now * 0.001, this.disasters?.weather);
       this.town?.update(now * 0.001);
-      this.disasters?.update(now * 0.001, this._lowPower, 2.35 - .1 * (this.dusk || 0));
+      this.disasters?.update(now * 0.001, this._lowPower, (NIGHT?1.65:2.35) - .1 * (this.dusk || 0));
       if (this._lowPower) this.renderer.render(this.scene, this.camera);
       else this.renderQuality.render();
     }

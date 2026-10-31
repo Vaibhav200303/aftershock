@@ -1,3 +1,4 @@
+import {NIGHT} from '../world/theme.js';
 import * as THREE from 'three';
 import {subscribeDisasters} from './state.js';
 const seed=i=>{const x=Math.sin(i*127.1+93.2)*43758.5453;return x-Math.floor(x);};
@@ -53,7 +54,7 @@ export function createDisasterEffects({scene,height,areas,sun,hemi,water,land}){
  shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8,0.9,0.98), smoothstep(0.35,0.8,vDisasterUp)*uDisasterFrost*0.85);');};
  m.customProgramCacheKey=()=>cache.call(m)+'-disaster-frost';m.needsUpdate=true;patched.push({m,before,cache});});
  const deep=water.uDeep.value.clone(),mid=water.uMid.value.clone(),shallow=water.uShallow.value.clone();
- const cool=new THREE.Color(0xc4e0ff),warm=new THREE.Color(0xfff1cf),storm=new THREE.Color(0xaec7d9),fire=new THREE.Color(0xffca81);
+ const cool=new THREE.Color(0xc4e0ff),warm=new THREE.Color(NIGHT?0xadc5ff:0xfff1cf),storm=new THREE.Color(0xaec7d9),fire=new THREE.Color(0xffca81);
  const mutedDeep=new THREE.Color(0x387e89),mutedMid=new THREE.Color(0x63a3a4),mutedShallow=new THREE.Color(0x96c4b5);
  return {
  get weather(){return weights;},
@@ -82,7 +83,7 @@ export function createDisasterEffects({scene,height,areas,sun,hemi,water,land}){
   rings.visible=weights.famine>.003;rings.children.forEach((r,i)=>{r.material.opacity=weights.famine*.45;r.scale.setScalar(1+((t*.12+i*.33)%1)*.6);});
   coins.visible=weights.crunch>.003;coins.children.forEach((coin,i)=>{coin.material.opacity=weights.crunch*.8;coin.position.y=Math.sin(t*.6+i)*.5;});
   sun.color.copy(warm).lerp(cool,c*.65).lerp(storm,h*.6).lerp(fire,f*.15);
-  sun.intensity=baseSun* (1-h*.3-c*.12);hemi.intensity=.95-h*.18;
+  sun.intensity=baseSun* (1-h*.3-c*.12);hemi.intensity=(NIGHT?.95:.95)-h*.18;
   water.uStorm.value=h;const dull=Math.max(weights.famine*.65,h*.5);
   water.uDeep.value.copy(deep).lerp(mutedDeep,dull);water.uMid.value.copy(mid).lerp(mutedMid,dull);water.uShallow.value.copy(shallow).lerp(mutedShallow,dull);
   land.material.color.setRGB(1-c*.08,1-c*.02,1);land.material.emissive.setRGB(c*.14,c*.19,c*.24);land.material.emissiveIntensity=c*.55;

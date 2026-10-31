@@ -1,3 +1,4 @@
+import {islandId} from './world/api.js';
 // One /state poll and one /events stream for the whole app.
 //
 // Before this was a single page, three things each polled the backend on their own: the
@@ -40,10 +41,11 @@ export async function refresh() {
 
 function openEvents() {
   if (events) return;
-  events = new EventSource('/events');
+  events = new EventSource('/events?island='+islandId());
   events.onmessage = ev => {
     let message;
     try { message = JSON.parse(ev.data); } catch { return; }   // the poll is the fallback
+    if(message.islandId&&message.islandId!==islandId())return;
     for (const fn of sseSubs) {
       try { fn(message); } catch (e) { console.error('sse subscriber failed:', e); }
     }

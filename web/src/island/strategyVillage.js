@@ -1,3 +1,4 @@
+import {NIGHT} from '../world/theme.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -36,7 +37,7 @@ export function addStrategyVillage(scene, height, areas) {
   const mat=(color,kind='plain') => {
     if(kind==='plain'&&[C.roof,C.tile,0xd06a35,C.blue,0x638c83].includes(color)) kind='clay';
     const key=`${color}:${kind}`;
-    if(!materials.has(key)) materials.set(key,new THREE.MeshStandardMaterial({color,
+    if(!materials.has(key)) materials.set(key,new THREE.MeshStandardMaterial({color:NIGHT&&kind==='clay'?(color===C.blue?0x36507c:0x667080):color,emissive:NIGHT&&color===C.glass?0xffbe66:0x000000,emissiveIntensity:NIGHT&&color===C.glass?.65:0,
       roughness:kind==='wood'?0.76:kind==='stone'?0.92:kind==='clay'?0.64:0.85,
       map:textures[kind]||null,bumpMap:relief[kind]||null,
       bumpScale:kind==='stone'?0.09:kind==='wood'?0.055:0.025,
@@ -178,7 +179,7 @@ export function addStrategyVillage(scene, height, areas) {
     }
   }
   // Stable variation gives the village a grown-over-time layout on every reload.
-  const warp = (x,z) => [x + Math.sin(z*0.075)*3.8 + Math.sin(x*0.11)*1.8,
+  const warp = (x,z) => NIGHT ? [x*.91+Math.sin(z*.07)*8,z*.78+(x>0?9:-5)] : [x + Math.sin(z*0.075)*3.8 + Math.sin(x*0.11)*1.8,
     z + Math.sin(x*0.08)*3.2 + Math.cos(z*0.09)*1.6];
   const lane = new THREE.CatmullRomCurve3([
     [-31,-29],[-3,-28],[29,-30],[32,-2],[30,29],[2,33],[-29,28],[-33,1]
@@ -304,6 +305,15 @@ export function addStrategyVillage(scene, height, areas) {
     if(areas.some(p=>Math.hypot(p.x-x,p.z-z)<9)||i%13<2)continue;
     const g=group(x,z);g.rotation.y=-a;
     box(g,1.7,1.5,6.4,0,0.6,0,C.stone,'stone');box(g,2,0.3,6.6,0,1.5,0,C.light);
+  }
+  if(NIGHT){
+    const lampMaterial=new THREE.MeshBasicMaterial({color:0xffd385});
+    for(let i=0;i<14;i++){
+      const p=lane.getPoint(i/14),x=p.x+2,z=p.z+2,y=height(x,z),g=group(x,z);
+      cyl(g,.18,6,0,3,0,0x39414e);box(g,1.3,.2,.9,0,6.2,0,0x39414e);box(g,.6,.9,.6,0,5.65,0,0xffd385);
+      const bulb=ball(g,.8,0,5.6,0,0xffd385);bulb.material=lampMaterial;
+      if(i%5===0){const light=new THREE.PointLight(0xffbb63,80,24,2);light.position.set(x,y+4,z);scene.add(light);}
+    }
   }
   // Merge static geometry by material, including all architectural surface detail.
   root.updateMatrixWorld(true);const buckets=new Map();
