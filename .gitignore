@@ -25,3 +25,6 @@ DEVPOST.md
 VIDEO_SCRIPT.md
 PITCH_CONTEXT.md
 docs/superpowers/
+
+# Local development tools and connection certificates
+.local/
