@@ -84,66 +84,72 @@ function setRange(next) {
   root.querySelectorAll('#range button').forEach(b => b.classList.toggle('on', b.dataset.r === next));
   if (last?.running && visible) { econ(); details(); }
 }
-const detailsOpen = () => $('more').open;
+const detailsOpen = () => activeTab !== 'overview';
 // a Solana explorer link for a transaction, on the same cluster as the ledger link the server gives
 const txUrl = sig => last.chain.explorer.replace(/\/address\/[^?]+/, '/tx/' + sig);
 
-const MARKUP = `
-<div class="top">
-  <h1>Village dashboard</h1>
-  <label class="pick" id="providerpick" hidden>provider <select id="providersel"></select></label>
-  <label class="agents">agents <input id="agents" type="number" min="2" max="137" step="1" value="100"></label>
-  <button id="btn" onclick="dash.toggle()">Start</button>
-  <button id="pausebtn" onclick="dash.togglePause()" disabled>Pause</button>
-  <button id="dialsbtn" onclick="dash.toggleDials()">Dials</button>
-  <span class="range" id="range"><button data-r="all">All</button><button data-r="window">Last ${RANGE_N}</button></span>
-  <span id="status"></span>
-</div>
-<div id="headline"></div>
-<div id="models"></div>
+let activeTab = 'overview';
+function selectTab(name, focus = false) {
+  if (!['overview', 'economy', 'villagers', 'activity'].includes(name)) return;
+  activeTab = name;
+  root.querySelectorAll('[data-tab]').forEach(button => {
+    const selected = button.dataset.tab === name;
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    if (selected && focus) button.focus();
+  });
+  root.querySelectorAll('[data-panel]').forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
+  swarm?.setActive(visible && name === 'villagers' && $('swarmbox').open);
+  if (last?.running && visible) { econ(); details(); }
+}
 
-<div id="admin-panel">
+const MARKUP = `
+<header class="dashboard-hero">
+  <div class="dashboard-eyebrow">AFTERSHOCK · VILLAGE ECONOMY</div>
+  <h1>Village dashboard</h1>
+  <p class="dashboard-intro">A clear view of life, work, and trade on your island.</p>
+  <div class="top">
+    <label class="pick" id="providerpick" hidden>Provider <select id="providersel"></select></label>
+    <label class="agents">Villagers <input aria-label="Number of villagers" id="agents" type="number" min="2" max="137" step="1" value="100"></label>
+    <button id="btn" onclick="dash.toggle()">Start</button>
+    <button id="pausebtn" onclick="dash.togglePause()" disabled>Pause</button>
+    <button id="dialsbtn" onclick="dash.toggleDials()">Dials</button>
+  </div>
+  <div id="status" role="status"></div>
+</header>
+<nav class="dashboard-tabs" role="tablist" aria-label="Village data">
+  ${[['overview','Overview'],['economy','Economy'],['villagers','Villagers'],['activity','Activity']].map(([id,label]) => `<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${id === 'overview'}" tabindex="${id === 'overview' ? 0 : -1}" data-tab="${id}">${label}</button>`).join('')}
+</nav>
+<div id="dashboard-empty" class="dashboard-empty"><span class="dashboard-eyebrow">YOUR ISLAND IS READY</span><h2>Bring the village to life</h2><p>Choose your villagers and press Start. Production, prices, and wellbeing will appear here as the rounds unfold.</p></div>
+<div id="admin-panel" inert>
   <button class="close" onclick="dash.toggleDials()">Close</button>
   <h2>Dials</h2>
-  <div class="presets" id="presets"></div>
-  <div id="dialgroups"></div>
-  <div id="pfeed"></div>
+  <div class="presets" id="presets"></div><div id="dialgroups"></div><div id="pfeed"></div>
 </div>
-
 <div id="dash" style="display:none">
-  <div class="tiles" id="tiles"></div>
-  <div id="tile-open"></div>
-
-  <div class="big">
-    <div class="chart" id="k-gdp"></div>
-    <div class="col">
-      <div id="cb-panel"></div>
-      <div class="chart" id="k-money"></div>
-    </div>
-    <div class="chart" id="k-prices"></div>
-    <div class="chart" id="k-jobs"></div>
+  <div class="dashboard-toolbar"><span>Chart history</span><span class="range" id="range"><button data-r="all">All rounds</button><button data-r="window">Last ${RANGE_N}</button></span></div>
+  <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-panel="overview">
+    <div class="section-heading"><h2>The village at a glance</h2><p>Select any metric to explore its trend.</p></div>
+    <div class="tiles" id="tiles"></div><div id="tile-open"></div>
+    <div class="big"><div class="chart" id="k-gdp"></div><div class="chart" id="k-jobs"></div></div>
+    <div class="section-heading"><h2>People & prosperity</h2><p>How the island’s wealth is shared.</p></div>
     <div class="chart" id="wealth"></div>
-    <div class="chart" id="bankfeed"></div>
-  </div>
-
-  <details class="more" id="more">
-    <summary>Details: order book, loans, needs, stock, prices, chain, round log, agents</summary>
-    <div class="box" id="world"></div>
-    <div class="small">
-      <div class="box" id="book" style="margin:0; min-width:300px; flex:1"></div>
-    </div>
-    <div class="small">
-      <div class="chart" id="k-fore"></div><div class="chart" id="k-needs"></div>
-      <div class="chart" id="k-held"></div><div class="chart" id="k-slack"></div>
-    </div>
-    <div class="small">
-      <div class="chart" id="c0"></div><div class="chart" id="c1"></div><div class="chart" id="c2"></div><div class="chart" id="c3"></div><div class="chart" id="c4"></div>
-    </div>
-    <div class="chart" id="txfeed" style="width:auto; margin:10px 0"></div>
-    <h3>Round log</h3>
-    <div class="box" id="events" style="margin-top:0"></div>
-    <h3>Agents <button id="allbtn" onclick="dash.toggleAll()" style="font-size:11px; padding:1px 8px"></button>
-      <span class="muted" style="font-weight:normal">click a villager to open their log</span></h3>
+  </section>
+  <details id="more" open>
+    <summary hidden>Detailed village data</summary>
+    <section id="panel-economy" role="tabpanel" aria-labelledby="tab-economy" data-panel="economy" hidden>
+      <div class="section-heading"><h2>Markets & banking</h2><p>Money, lending, and the goods that keep the village moving.</p></div>
+      <div id="cb-panel"></div>
+      <div class="big"><div class="chart" id="k-money"></div><div class="chart" id="k-prices"></div></div>
+      <h3>Prices by resource</h3><div class="resource-charts small"><div class="chart" id="c0"></div><div class="chart" id="c1"></div><div class="chart" id="c2"></div><div class="chart" id="c3"></div><div class="chart" id="c4"></div></div>
+      <details class="more"><summary>Order book · current bids and offers</summary><div class="box" id="book"></div></details>
+      <div class="big"><div class="chart" id="k-fore"></div><div class="chart" id="bankfeed"></div></div>
+    </section>
+    <section id="panel-villagers" role="tabpanel" aria-labelledby="tab-villagers" data-panel="villagers" hidden>
+      <div class="section-heading"><h2>Meet your villagers</h2><p>Follow their work, needs, belongings, and decisions.</p></div>
+      <div class="big"><div class="chart" id="k-needs"></div><div class="chart" id="k-held"></div><div class="chart" id="k-slack"></div></div>
+      <div class="villager-heading"><h3>Villager records</h3><button id="allbtn" onclick="dash.toggleAll()"></button></div>
+      <p class="muted">Select a villager to read their log. Scroll the table sideways for all details.</p>
     <div class="scroll"><table>
       <thead><tr>
         <th></th><th>agent</th><th>skills f/w/n</th><th>doing</th><th class="n">cash</th><th class="n">food</th>
@@ -152,13 +158,17 @@ const MARKUP = `
       </tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
-  </details>
-</div>
 
-<details class="more swarmbox" id="swarmbox">
-  <summary>Agent swarm: every villager as one living graph, and the coins moving between them</summary>
-  <div id="swarm"></div>
-</details>`;
+      <details class="more swarmbox" id="swarmbox"><summary>Village connections · villagers and the coins moving between them</summary><div id="swarm"></div></details>
+    </section>
+    <section id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" data-panel="activity" hidden>
+      <div class="section-heading"><h2>Behind each round</h2><p>Simulation details, model usage, and on-chain activity.</p></div>
+      <h3>Run status</h3><div class="box" id="headline"></div><div id="models"></div>
+      <details class="more"><summary>Detailed village snapshot</summary><div class="box" id="world"></div></details>
+      <div class="chart" id="txfeed"></div><h3>Round log</h3><div class="box" id="events"></div>
+    </section>
+  </details>
+</div>`;
 
 // Every transaction the village has just made, newest first, with what it did and a link
 // to it on the explorer. A trade in the village and a signature on the chain, side by side.
@@ -350,6 +360,7 @@ function tiles() {
   for (const t of TILES) {
     const el = $('t-' + t.id);
     el.classList.toggle('on', openTile === t.id);
+    el.setAttribute('aria-expanded', String(openTile === t.id));
     el.innerHTML = `<div class="lab"><span>${t.label}</span><span>${t.sub}</span></div>` +
       `<div class="val">${t.val(m)}</div>${spark(h.map(t.spark), t.color)}`;
   }
@@ -532,7 +543,7 @@ function toggleAgent(id) {
 }
 /** From the swarm: open this villager's log, wherever in the table they are, and go to it. */
 function openAgent(id) {
-  $('more').open = true;
+  selectTab('villagers');
   showAll = true;                       // they may not be in the top ten
   openAgents.add(id); logsAt = 0;
   details();
@@ -694,6 +705,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 function toggleDials() {
   const open = $('admin-panel').classList.toggle('open');
+  $('admin-panel').inert = !open;
   root.classList.toggle('dials-open', open);
   if (open && !dials) loadDials();
 }
@@ -829,6 +841,7 @@ function render(s, error) {
   const pb = $('pausebtn');
   pb.disabled = !running;
   pb.textContent = s.pausing ? 'Cancel pause' : s.paused ? 'Resume' : 'Pause';
+  $('dashboard-empty').hidden = running;
   const cfg = s.config ?? {};
   // The village size is chosen here before a start, and fixed while it runs.
   const agentsEl = $('agents');
@@ -872,10 +885,23 @@ export function mountAdmin(el) {
   root = el;
   el.innerHTML = MARKUP;
   btn = $('btn'); statusEl = $('status'); world = $('world'); events = $('events'); rows = $('rows');
-  $('tiles').innerHTML = TILES.map(t => `<div class="tile" id="t-${t.id}" title="Open the full chart"></div>`).join('');
+  $('tiles').innerHTML = TILES.map(t => `<button type="button" class="tile" id="t-${t.id}" aria-expanded="false" aria-controls="tile-open" title="Open ${t.label} chart"></button>`).join('');
   TILES.forEach(t => { $('t-' + t.id).onclick = () => { openTile = openTile === t.id ? null : t.id; tiles(); }; });
   $('more').addEventListener('toggle', () => { if (last?.running && visible) { details(); econ(); } });
   $('agents').addEventListener('input', () => { agentsTouched = true; });
+  root.querySelectorAll('[data-tab]').forEach(button => {
+    button.addEventListener('click', () => selectTab(button.dataset.tab));
+    button.addEventListener('keydown', event => {
+      const tabs = [...root.querySelectorAll('[data-tab]')];
+      let index = tabs.indexOf(button);
+      if (event.key === 'ArrowRight') index = (index + 1) % tabs.length;
+      else if (event.key === 'ArrowLeft') index = (index + tabs.length - 1) % tabs.length;
+      else if (event.key === 'Home') index = 0;
+      else if (event.key === 'End') index = tabs.length - 1;
+      else return;
+      event.preventDefault(); selectTab(tabs[index].dataset.tab, true);
+    });
+  });
   root.querySelectorAll('#range button').forEach(b => b.addEventListener('click', () => setRange(b.dataset.r)));
   setRange(range === 'window' ? 'window' : 'all');
   window.dash = { toggle, togglePause, toggleDials, post, slide, loadDials, toggleAll: () => { showAll = !showAll; agentTable(); },
@@ -887,13 +913,13 @@ export function mountAdmin(el) {
   loadDials();
   // the swarm simulates and draws only while its section is open and the panel is on screen
   swarm = mountSwarm($('swarm'), { onPick: openAgent });
-  $('swarmbox').addEventListener('toggle', () => swarm.setActive(visible && $('swarmbox').open));
+  $('swarmbox').addEventListener('toggle', () => swarm.setActive(visible && activeTab === 'villagers' && $('swarmbox').open));
 }
 
 /** The shell tells us whether we are on screen; hidden, we draw nothing. */
 export function setAdminVisible(on) {
   const was = visible;
   visible = on;
-  swarm?.setActive(on && $('swarmbox').open);
+  swarm?.setActive(on && activeTab === 'villagers' && $('swarmbox').open);
   if (on && !was && last) render(last);
 }
