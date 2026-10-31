@@ -10,7 +10,7 @@ import { createRoot } from 'react-dom/client';
 import './shell/shell.css';
 import './shell/hud.css';
 import IslandApp from './island/IslandApp.jsx';
-import { mountAdmin, setAdminVisible } from './admin/AdminPanel.js';
+import { mountAdmin, setAdminVisible, toggleWorldControls } from './admin/AdminPanel.js';
 import { mountKeyGate } from './KeyGate.js';
 
 const ADMIN_PATH = '/dashboard';
@@ -128,7 +128,7 @@ mountAdmin(adminRoot);
 const worldRoot=document.createElement('div');document.body.appendChild(worldRoot);createRoot(worldRoot).render(<WorldHub/>);
 mountKeyGate(document.body);         // the front door, where the server holds no API key
 createRoot(document.getElementById('island-root')).render(
-  <IslandApp ref={islandRef} onAdmin={() => go('admin')} />,
+  <IslandApp ref={islandRef} onAdmin={() => go('admin')} onWorldControls={toggleWorldControls} />,
 );
 
 apply(viewFor(location.pathname));

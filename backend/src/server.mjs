@@ -635,8 +635,17 @@ const server = http.createServer(async (req, res) => {
       return json(res, { id: a.id, name: a.name, model: a.model ?? null, traits: a.traits,
                          decisions: sim.agentLog.get(a.id) ?? [], journal: a.journal });
     }
-    if (pathname === '/tunables' && req.method === 'GET') return json(res,sim&&sim.islandId===islandId?tunableSnapshot():store.latest(islandId)?.dials||tunableSnapshot());
-    if (pathname === '/tunables' && req.method === 'POST') return json(res, setTunables(await readBody(req)));
+    if (pathname === '/tunables' && req.method === 'GET') {
+      if (url.searchParams.get('view') === 'controls') {
+        if (sim && sim.islandId !== islandId) return json(res, { error: 'Stop the other island’s simulation before changing this world.' }, 409);
+        return json(res, tunableSnapshot());
+      }
+      return json(res, sim && sim.islandId === islandId ? tunableSnapshot() : store.latest(islandId)?.dials || tunableSnapshot());
+    }
+    if (pathname === '/tunables' && req.method === 'POST') {
+      if (sim && sim.islandId !== islandId) return json(res, { error: 'Stop the other island’s simulation before changing this world.' }, 409);
+      return json(res, setTunables(await readBody(req)));
+    }
     // { provider: "deepinfra", agents: 30 } sets up the run; no body means what .env says
     if (pathname === '/start'  && req.method === 'POST') {
       if(sim&&sim.islandId!==islandId)return json(res,{error:'Stop the active island before starting another economy.'},409);

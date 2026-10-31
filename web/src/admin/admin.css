@@ -280,3 +280,46 @@ body #admin-root .dashboard-empty p { max-width: 520px; margin: 12px auto 0; col
 /* Let the drawer and its scrim sit above the live island inset as well. */
 body.view-admin #admin-root.dials-open { z-index: auto; }
 body #admin-root #dials-backdrop { position:fixed; inset:0; z-index:50; padding:0; border:0; border-radius:0; background:var(--hud-scrim,rgba(18,40,38,.28)); cursor:default; }
+
+/* Shared World Controls drawer, available from either view. */
+#world-controls-root [hidden] { display: none !important; }
+#world-controls-root #dials-backdrop { position: fixed; inset: 0; z-index: 90; border: 0; border-radius: 0; background: var(--hud-scrim); padding: 0; width: 100%; cursor: default; }
+#world-controls-root #admin-panel { box-sizing: border-box; z-index: 91; top: 16px; right: 16px; bottom: 16px; width: 430px; max-width: calc(100vw - 32px); padding: 24px; background: var(--hud-paper); color: var(--hud-ink); font: 14px/1.5 Nunito, system-ui, sans-serif; border: 0; border-radius: 16px; box-shadow: 0 16px 48px #163c3b40; overscroll-behavior: contain; scrollbar-color: #b3b99d var(--hud-paper); }
+#world-controls-root .world-controls-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#world-controls-root #admin-panel h2 { font: 900 24px/1.2 Nunito, system-ui, sans-serif; }
+#world-controls-root #admin-panel h3 { font-size: 16px; margin: 0 0 8px; }
+#world-controls-root #admin-panel p { margin: 8px 0 14px; color: #526a5d; }
+#world-controls-root #admin-panel button { color: var(--hud-ink); background: #ede7d4; border: 1px solid var(--hud-rule); border-radius: 8px; padding: 9px 12px; min-height: 40px; line-height: 1.3; }
+#world-controls-root #admin-panel button:hover { background: #e2e8d6; border-color: #749786; }
+#world-controls-root #admin-panel button:disabled { opacity: .5; cursor: not-allowed; }
+#world-controls-root :is(button, input, summary):focus-visible { outline: 3px solid var(--hud-teal); outline-offset: 3px; }
+#world-controls-root #admin-panel .close { float: none; font-size: 12px; }
+#world-controls-root .world-conditions { padding: 16px 0; margin: 18px 0 0; border-top: 1px solid var(--hud-rule); border-bottom: 1px solid var(--hud-rule); }
+#world-controls-root #world-conditions ul { padding: 0; margin: 8px 0 16px; list-style: none; max-height: 175px; overflow-y: auto; }
+#world-controls-root #world-conditions li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 5px 0; font-size: 13px; }
+#world-controls-root #world-conditions li b { color: #8a541c; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#world-controls-root #world-reset { width: 100%; }
+#world-controls-root .world-presets { margin-top: 24px; }
+#world-controls-root #presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#world-controls-root #presets .world-preset { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; text-align: left; padding: 12px; background: #f7f1df; font-size: 13px; }
+#world-controls-root #presets .world-preset strong { font-weight: 900; text-transform: capitalize; }
+#world-controls-root #presets .world-preset span { font-size: 12px; color: #526a5d; }
+#world-controls-root #presets .world-preset.is-active { border-color: var(--hud-teal); background: #e1ead8; }
+#world-controls-root #presets .world-preset small { color: #215b4d; font-weight: 900; }
+#world-controls-root #presets h4 { grid-column: 1 / -1; font-size: 14px; margin: 12px 0 0; }
+#world-controls-root :is(.world-advanced, .world-history) { margin-top: 24px; border-top: 1px solid var(--hud-rule); padding-top: 16px; }
+#world-controls-root summary { cursor: pointer; font-weight: 800; padding: 4px 0; }
+#world-controls-root #admin-panel .grp { margin-top: 20px; padding-top: 14px; border-color: var(--hud-rule); }
+#world-controls-root #admin-panel .grp .gb, #world-controls-root #admin-panel .dial .dh, #world-controls-root #admin-panel .muted { color: #526a5d; }
+#world-controls-root #admin-panel .dial { margin: 16px 0; }
+#world-controls-root #admin-panel .dial .dl span { white-space: normal; }
+#world-controls-root #admin-panel .dial input[type=range] { accent-color: var(--hud-teal); min-height: 28px; }
+#world-controls-root #admin-panel .dial .next { color: #675831; border-color: var(--hud-rule); white-space: nowrap; }
+#world-controls-root #admin-panel .dial .rst { min-height: 28px; padding: 2px 8px; margin-left: 6px; }
+#world-controls-root #admin-panel #pfeed { border: 0; padding: 0; font-size: 12px; }
+#world-controls-root #admin-panel #pfeed div { color: #80511c; margin-top: 8px; }
+#world-controls-root #world-controls-message { color: #80511c; font-size: 12px; }
+#world-controls-root #world-controls-message:empty { display: none; }
+@media (max-width: 600px) {
+  #world-controls-root #admin-panel { inset: 8px; width: auto; max-width: none; padding: 20px; }
+}

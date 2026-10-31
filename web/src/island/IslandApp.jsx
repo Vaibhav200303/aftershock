@@ -619,11 +619,12 @@ export default class IslandApp extends React.Component {
         <footer className="hud-dock" style={v.footerStyle}>
 
           <div style={S("display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%;")}>
-            <div style={S("display: flex; align-items: center; gap: 14px; padding-right: 4px;")}>
+            <div className="hud-actions" style={S("display: flex; align-items: center; gap: 8px; padding-right: 4px;")}>
               <button className="hud-run" onClick={v.toggleRun} style={v.runBtnStyle}>{v.runLabel}</button>
               <button className="hud-pause" disabled={!this.state.running || this.state.busy} onClick={v.togglePause} style={v.pauseBtnStyle}>{v.pauseLabel}</button>
+              <button className="hud-world-controls" aria-controls="admin-panel" aria-expanded="false" aria-haspopup="dialog" onClick={this.props.onWorldControls}>World Controls</button>
             </div>
-            <div style={S("flex: 1; min-width: 0; overflow: hidden; background: #f0ead8; border: 1px solid #ded5ba; border-radius: 8px; padding: 3px 0; mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);")}>
+            <div className="hud-wire" style={S("flex: 1; min-width: 0; overflow: hidden; background: #f0ead8; border: 1px solid #ded5ba; border-radius: 8px; padding: 3px 0; mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);")}>
               <div data-crawl="wire" style={S("display: flex; width: max-content; will-change: transform; font-family: 'Baloo 2', cursive; font-size: 17px; font-weight: 600; color: #263f38; white-space: nowrap;")}>
                 <span style={S("padding-right: 46px;")}>{v.wireText}</span>
                 <span style={S("padding-right: 46px;")} aria-hidden="true">{v.wireText}</span>
@@ -649,7 +650,7 @@ export default class IslandApp extends React.Component {
                 </span>
               ))}
             </div>
-            <a href="/dashboard" onClick={this.openAdmin} title="The dials, the charts, every readout (Esc)"
+            <a href="/dashboard" onClick={this.openAdmin} title="Village charts and detailed data (Esc)"
                style={S("justify-self: end; color: #263f38; border: 1px solid rgba(255,255,255,.28); border-radius: 5px; padding: 2px 10px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; cursor: pointer;")}>Dashboard</a>
           </div>
         </footer>

@@ -48,3 +48,12 @@ body #admin-root #admin-panel,body #admin-root #agent-panel,body #admin-root .ch
 body #admin-root .range { border-color:var(--hud-rule); border-radius:7px; overflow:hidden; }
 body #admin-root .range button.on,body #admin-root #btn { background:var(--hud-teal); color:#fff8e7; }
 body #admin-root #btn:disabled { opacity:.5; }
+
+.hud-world-controls { flex: none; cursor: pointer; border: 1px solid #9cad8e; border-radius: 8px; padding: 9px 12px; min-height: 38px; background: #e3ead5; color: var(--hud-ink); font: 800 14px Nunito, system-ui, sans-serif; white-space: nowrap; }
+.hud-world-controls:hover { background: #d2dfc3; border-color: var(--hud-teal); }
+.hud-actions { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .hud-world-controls { font-size: 12px; padding: 8px 10px; }
+  .hud-dock .hud-wire { display: none; }
+  .hud-actions { flex: 1; justify-content: space-between; }
+}

@@ -4,7 +4,7 @@
 // shared /state store instead of polling on its own, the inline handlers go through the
 // `dash` namespace rather than globals, and it draws nothing while it is out of view.
 import './admin.css';
-import {acceptDisasters} from '../disasters/state.js';
+import {acceptDisasters, deriveDisasters} from '../disasters/state.js';
 import { subscribe, refresh as refreshState } from '../store.js';
 import { mountSwarm } from './Swarm.js';
 
@@ -114,7 +114,7 @@ const MARKUP = `
     <label class="agents">Villagers <input aria-label="Number of villagers" id="agents" type="number" min="2" max="137" step="1" value="100"></label>
     <button id="btn" onclick="dash.toggle()">Start</button>
     <button id="pausebtn" onclick="dash.togglePause()" disabled>Pause</button>
-    <button id="dialsbtn" onclick="dash.toggleDials()">Dials</button>
+    <button id="dialsbtn" onclick="dash.toggleDials()">World Controls</button>
   </div>
   <div id="status" role="status"></div>
 </header>
@@ -122,11 +122,17 @@ const MARKUP = `
   ${[['overview','Overview'],['economy','Economy'],['villagers','Villagers'],['activity','Activity']].map(([id,label]) => `<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${id === 'overview'}" tabindex="${id === 'overview' ? 0 : -1}" data-tab="${id}">${label}</button>`).join('')}
 </nav>
 <div id="dashboard-empty" class="dashboard-empty"><span class="dashboard-eyebrow">YOUR ISLAND IS READY</span><h2>Bring the village to life</h2><p>Choose your villagers and press Start. Production, prices, and wellbeing will appear here as the rounds unfold.</p></div>
-<button id="dials-backdrop" aria-label="Dismiss Dials" tabindex="-1" onclick="dash.toggleDials()" hidden></button>
-<div id="admin-panel" inert>
-  <button class="close" onclick="dash.toggleDials()">Close</button>
-  <h2>Dials</h2>
-  <div class="presets" id="presets"></div><div id="dialgroups"></div><div id="pfeed"></div>
+<div id="world-controls-root">
+<button id="dials-backdrop" aria-label="Close World Controls" tabindex="-1" onclick="dash.toggleDials()" hidden></button>
+<section id="admin-panel" role="dialog" aria-modal="true" aria-labelledby="world-controls-title" aria-describedby="world-controls-help" hidden inert>
+  <header class="world-controls-header"><h2 id="world-controls-title">World Controls</h2><button class="close" onclick="dash.toggleDials()" aria-label="Close World Controls">Close</button></header>
+  <p id="world-controls-help">Change conditions and watch your villagers adapt.</p>
+  <div id="world-controls-message" role="status" aria-live="polite"></div>
+  <section class="world-conditions" aria-labelledby="world-conditions-title"><h3 id="world-conditions-title">Active conditions</h3><div id="world-conditions"></div><button id="world-reset" disabled onclick="dash.post({preset:'baseline'})">Reset to normal</button></section>
+  <section class="world-presets" aria-labelledby="world-presets-title"><h3 id="world-presets-title">Disaster presets</h3><p>Presets combine. Reset to normal to clear live changes.</p><div class="presets" id="presets"></div></section>
+  <details class="world-advanced"><summary>Advanced economic settings</summary><p>Live changes take effect next round. Settings marked “next run” apply when a new village starts.</p><div id="dialgroups"></div></details>
+  <details class="world-history"><summary>Changes this run</summary><div id="pfeed"></div></details>
+</section>
 </div>
 <div id="dash" style="display:none">
   <div class="dashboard-toolbar"><span>Chart history</span><span class="range" id="range"><button data-r="all">All rounds</button><button data-r="window">Last ${RANGE_N}</button></span></div>
@@ -705,40 +711,97 @@ function details() {
 let dials = null;                 // the last /tunables snapshot
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function toggleDials() {
-  const open = $('admin-panel').classList.toggle('open');
-  $('admin-panel').inert = !open;
+let controlsOpener = null;
+let controlsLoadVersion = 0;
+let controlsBackground = [];
+let previousOverflow = '';
+export function toggleWorldControls() {
+  const panel = $('admin-panel');
+  const open = !panel.classList.contains('open');
+  if (open) {
+    controlsOpener = document.activeElement;
+    previousOverflow = document.body.style.overflow;
+    controlsBackground = [...document.body.children].filter(el => el !== $('world-controls-root') && !['SCRIPT', 'STYLE', 'LINK'].includes(el.tagName)).map(el => [el, el.inert]);
+    controlsBackground.forEach(([el]) => { el.inert = true; });
+    document.body.style.overflow = 'hidden';
+  }
+  panel.hidden = !open;
+  panel.classList.toggle('open', open);
+  panel.inert = !open;
   $('dials-backdrop').hidden = !open;
-  $('dialsbtn').setAttribute('aria-expanded', String(open));
-  if (!open) $('dialsbtn').focus();
+  document.querySelectorAll('[aria-controls="admin-panel"]').forEach(button => button.setAttribute('aria-expanded', String(open)));
   root.classList.toggle('dials-open', open);
-  if (open) $('admin-panel').querySelector('.close').focus();
-  if (open && !dials) loadDials();
+  if (open) { panel.querySelector('.close').focus(); loadDials(); }
+  else {
+    controlsBackground.forEach(([el, inert]) => { el.inert = inert; });
+    controlsBackground = [];
+    document.body.style.overflow = previousOverflow;
+    controlsOpener?.focus();
+  }
 }
+const toggleDials = toggleWorldControls;
 
 // A panel that fails silently is worse than no panel: say so on the page.
 async function loadDials() {
+  if (posting) return;
+  const version = ++controlsLoadVersion;
+  $('world-controls-message').textContent = 'Loading conditions…';
   try {
-    const r = await fetch('/tunables');
-    if (!r.ok) throw new Error(`/tunables returned ${r.status}`);
-    dials = await r.json();
+    const r = await fetch('/tunables?view=controls');
+    const next = await r.json();
+    if (version !== controlsLoadVersion) return;
+    if (!r.ok) throw new Error(next.error || 'Could not load conditions.');
+    dials = next;
     if (!dials?.tunables?.length) throw new Error('/tunables returned no dials');
     drawDials();
+    $('world-controls-message').textContent = '';
   } catch (e) {
+    if (version !== controlsLoadVersion) return;
     dials = null;
     console.error('loadDials:', e);
-    $('dialgroups').innerHTML = `<div class="hungry">could not load the dials: ${esc(e.message)}` +
-      `<br><button onclick="dash.loadDials()" style="margin-top:6px">Try again</button></div>`;
+    $('world-controls-message').innerHTML = `${esc(e.message)} <button onclick="dash.loadDials()">Try again</button>`;
+    $('presets').innerHTML = '';
+    $('dialgroups').innerHTML = '';
+    $('world-conditions').textContent = 'Conditions unavailable.';
+    $('world-reset').disabled = true;
   }
 }
 
 // POST one dial (or a preset) and redraw from the snapshot that comes back.
+let posting = false;
 async function post(body) {
-  dials = await (await fetch('/tunables', { method: 'POST', headers: { 'content-type': 'application/json' },
-                                            body: JSON.stringify(body) })).json();
-  acceptDisasters(dials);
-  drawDials();
-  refreshState();
+  clearTimeout(pending);
+  if (posting) return;
+  posting = true;
+  controlsLoadVersion++;
+  const focused = document.activeElement;
+  const focusedKey = focused?.closest('.dial')?.dataset.key;
+  const focusedPreset = focused?.closest('.world-preset')?.dataset.preset;
+  $('admin-panel').setAttribute('aria-busy', 'true');
+  const controls = [...$('admin-panel').querySelectorAll('#presets button, #world-reset, #dialgroups input, #dialgroups button')];
+  controls.forEach(el => { el.disabled = true; });
+  $('world-controls-message').textContent = 'Applying conditions…';
+  try {
+    const response = await fetch('/tunables', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const next = await response.json();
+    if (!response.ok || !next.tunables) throw new Error(next.error || 'Could not apply conditions.');
+    dials = next;
+    acceptDisasters(dials);
+    drawDials();
+    $('world-controls-message').textContent = body.preset === 'baseline' ? 'Live conditions restored to normal. Next-run settings are unchanged.' : 'Conditions updated. Live changes take effect next round.';
+    refreshState();
+  } catch (error) {
+    $('world-controls-message').textContent = error.message === 'Failed to fetch' ? 'Could not apply conditions. Check your connection and try again.' : error.message;
+  } finally {
+    posting = false;
+    $('admin-panel').removeAttribute('aria-busy');
+    controls.forEach(el => { el.disabled = false; });
+    $('world-reset').disabled = !dials?.tunables.some(t => t.live && t.moved);
+    if ($('admin-panel').classList.contains('open')) {
+      if (focusedPreset) [...$('presets').querySelectorAll('[data-preset]')].find(el => el.dataset.preset === focusedPreset)?.focus();
+      else if (focusedKey) [...$('dialgroups').querySelectorAll('.dial')].find(el => el.dataset.key === focusedKey)?.querySelector('input')?.focus();
+    }
+  }
 }
 let pending = null;               // debounce: a drag posts once it settles, not per pixel
 function slide(key, raw, el) {
@@ -761,8 +824,12 @@ function fmtDial(t, v) {
 
 function drawDials() {
   if (!dials) return;
-  $('presets').innerHTML = (dials.presets ?? []).map(p =>
-    `<button class="${p.id === 'baseline' ? 'base' : ''}" title="${esc(p.note)}" onclick="dash.post({preset:'${p.id}'})">${esc(p.label)}</button>`).join('');
+  const active = deriveDisasters(dials);
+  const moved = dials.tunables.filter(t => t.moved);
+  $('world-conditions').innerHTML = moved.length ? '<ul>' + moved.map(t => `<li><span>${esc(t.label)}${t.live ? '' : ' (next run)'}</span><b>${esc(t.shown)}</b></li>`).join('') + '</ul>' : '<p>Normal conditions. Your village is using its default settings.</p>';
+  $('world-reset').disabled = !moved.some(t => t.live);
+  const presetButton = p => `<button data-preset="${p.id}" class="world-preset ${active[p.id] > .01 ? 'is-active' : ''}" ${p.id in active ? `aria-pressed="${active[p.id] > .01}"` : ''} onclick="dash.post({preset:'${p.id}'})"><strong>${esc(p.label)}</strong><span>${esc(p.note)}</span>${active[p.id] > .01 ? '<small>Active</small>' : ''}</button>`;
+  $('presets').innerHTML = (dials.presets ?? []).filter(p => p.id in active).map(presetButton).join('') + '<h4>Favorable conditions</h4>' + (dials.presets ?? []).filter(p => p.id !== 'baseline' && !(p.id in active)).map(presetButton).join('');
   $('dialgroups').innerHTML = (dials.groups ?? []).map(g => {
     const ds = (dials.tunables ?? []).filter(t => t.group === g.id);
     if (!ds.length) return '';
@@ -772,7 +839,7 @@ function drawDials() {
           <span><b class="dv">${esc(t.shown)}</b>${t.moved ? `<button class="rst" title="back to ${esc(String(t.dflt))}" onclick="dash.post({changes:{'${esc(t.key)}':${JSON.stringify(t.dflt)}}})">↺</button>` : ''}</span></div>` +
         (t.bool
           ? `<div><label><input type="checkbox" ${t.value ? 'checked' : ''} onchange="dash.post({changes:{'${esc(t.key)}':this.checked}})"> ${esc(t.label)}</label></div>`
-          : `<input type="range" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.value}" oninput="dash.slide('${esc(t.key)}', this.value, this)">`) +
+          : `<input type="range" aria-label="${esc(t.label)}" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.value}" oninput="dash.slide('${esc(t.key)}', this.value, this)">`) +
         (t.help ? `<div class="dh">${esc(t.help)}</div>` : '') + `</div>`).join('') + '</div>';
   }).join('');
   policyFeed();
@@ -781,8 +848,8 @@ function drawDials() {
 // What has been pulled this run, newest first — the same list the charts are marked from.
 function policyFeed() {
   const p = last?.policy ?? [];
-  $('pfeed').innerHTML = !p.length ? '<span class="muted">nothing pulled yet this run</span>'
-    : '<b>Pulled this run</b>' + p.slice().reverse().slice(0, 12).map(e =>
+  $('pfeed').innerHTML = !p.length ? '<span class="muted">No changes yet this run.</span>'
+    : '<b>Recent changes</b>' + p.slice().reverse().slice(0, 12).map(e =>
         `<div>r${e.round} · ${e.changes.map(c => `${esc(c.label)} ${esc(c.fromShown)} → ${esc(c.toShown)}`).join('; ')}</div>`).join('');
 }
 
@@ -892,17 +959,24 @@ let swarm = null;
 export function mountAdmin(el) {
   root = el;
   el.innerHTML = MARKUP;
+  document.body.appendChild($('world-controls-root'));
   btn = $('btn'); statusEl = $('status'); world = $('world'); events = $('events'); rows = $('rows');
   $('tiles').innerHTML = TILES.map(t => `<button type="button" class="tile" id="t-${t.id}" aria-expanded="false" aria-controls="tile-open" title="Open ${t.label} chart"></button>`).join('');
   TILES.forEach(t => { $('t-' + t.id).onclick = () => { openTile = openTile === t.id ? null : t.id; tiles(); }; });
   $('more').addEventListener('toggle', () => { if ((last?.running || last?.completed) && visible) { details(); econ(); } });
   $('dialsbtn').setAttribute('aria-expanded', 'false');
   $('dialsbtn').setAttribute('aria-controls', 'admin-panel');
-  root.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && root.classList.contains('dials-open')) {
-      event.stopPropagation(); toggleDials();
+  document.addEventListener('keydown', event => {
+    const panel = $('admin-panel');
+    if (!panel.classList.contains('open')) return;
+    if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); toggleDials(); }
+    if (event.key === 'Tab') {
+      const focusable = [...panel.querySelectorAll('button, input, summary, [tabindex="0"]')].filter(el => !el.disabled && el.getClientRects().length);
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
-  });
+  }, true);
   $('agents').addEventListener('input', () => { agentsTouched = true; });
   root.querySelectorAll('[data-tab]').forEach(button => {
     button.addEventListener('click', () => selectTab(button.dataset.tab));

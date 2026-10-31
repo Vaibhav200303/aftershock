@@ -216,6 +216,13 @@ export const PRESETS = [
 // The config as it was loaded, so "baseline" means something and the panel can mark a dial
 // as moved. Captured at import, before anything can have changed it.
 export const DEFAULTS = Object.fromEntries(TUNABLES.map(t => [t.key, getVal(t.key)]));
+// Environment defaults must remain reachable by sliders and the baseline preset.
+for (const t of TUNABLES) {
+  if (t.bool || !Number.isFinite(DEFAULTS[t.key])) continue;
+  t.min = Math.min(t.min, DEFAULTS[t.key]);
+  t.max = Math.max(t.max, DEFAULTS[t.key]);
+}
+
 
 const coerce = (t, raw) => {
   if (t.bool) return !!raw;
