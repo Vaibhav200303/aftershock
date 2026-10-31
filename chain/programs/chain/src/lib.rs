@@ -6,9 +6,9 @@
 //! Five goods, in this order: food, wood, nets, boats, houses. Everything but food can
 //! be pledged to the bank.
 //!
-//! Only the ledger's authority (the village server) may write to it — with two
-//! exceptions: `liquidate` and `pay_dividend` are permissionless, so anyone can
-//! foreclose a bad loan or pay out the bank's surplus. Everything written is checked:
+//! Only the ledger's authority (the village server) may write to it — with one
+//! exception: `pay_dividend` is permissionless, so anyone can pay out the bank's
+//! surplus. Everything written is checked:
 //! no balance can go negative, no good can be conjured by a trade, and the market
 //! clears at one uniform price for everyone.
 //!
@@ -221,7 +221,7 @@ pub mod chain {
         emit!(Borrowed { agent, amount, debt, accrued, due_slot });
         settle_money(
             &l, &ctx.accounts.mint, &ctx.accounts.vault, &ctx.accounts.token_program,
-            &ledger_key, ctx.bumps.mint, m0,
+            &ledger_key, ctx.bumps.mint, m0, None,
         )
     }
 
@@ -231,7 +231,7 @@ pub mod chain {
     /// principal is written off against the bank's equity (the unpaid interest was
     /// never income), and the whole remainder is counted in `forgiven`. Paid off, the
     /// collateral unlocks. With less than a coin owing, a repay of 0 closes the loan too.
-    pub fn repay(ctx: Context<WriteMint>, agent: u16, amount: u64) -> Result<()> {
+    pub fn repay<'i>(ctx: Context<'i, WriteMint<'i>>, agent: u16, amount: u64) -> Result<()> {
         let now = Clock::get()?.slot;
         let ledger_key = ctx.accounts.ledger.key();
         let mut l = ctx.accounts.load_checked()?;
@@ -262,13 +262,13 @@ pub mod chain {
         emit!(Repaid { agent, paid, interest, principal, forgiven });
         settle_money(
             &l, &ctx.accounts.mint, &ctx.accounts.vault, &ctx.accounts.token_program,
-            &ledger_key, ctx.bumps.mint, m0,
+            &ledger_key, ctx.bumps.mint, m0, debtor_purse(&ctx.remaining_accounts, agent),
         )
     }
 
-    /// Collect a loan that has come due, or foreclose it. PERMISSIONLESS: any signer may
-    /// call this — the server can't protect a debtor, and a stranger can enforce the
-    /// bank's rules without asking.
+    /// Collect a loan that has come due, or foreclose it. The bank does this: it is the
+    /// lender, and the only party with a claim on the debtor. Like every other write, it
+    /// is signed by the ledger's authority.
     ///
     /// Interest is accrued to now first. Then it is allowed when the loan is overdue
     /// (the chain's clock is past the due slot), or on a margin call: when the debt is
@@ -298,10 +298,10 @@ pub mod chain {
     ///     bank's cash at once (a loss bigger than its cash is `bad_debt`), and the
     ///     seized goods go on the bank's books at their fire-sale value (`bank_book`,
     ///     `seized_value`). Selling them at that value later is neither profit nor loss.
-    pub fn liquidate(ctx: Context<AnyoneMint>, agent: u16) -> Result<()> {
+    pub fn collect<'i>(ctx: Context<'i, WriteMint<'i>>, agent: u16) -> Result<()> {
         let now = Clock::get()?.slot;
         let ledger_key = ctx.accounts.ledger.key();
-        let mut l = ctx.accounts.ledger.load_mut()?;
+        let mut l = ctx.accounts.load_checked()?;
         let m0 = money(&l);
         require!((agent as u32) < l.num_agents, EconErr::BadAgent);
         require!(l.slots[agent as usize].debt > 0, EconErr::NoLoan);
@@ -310,7 +310,7 @@ pub mod chain {
         let s = &mut l.slots[agent as usize];
         let overdue = now > s.due_slot as u64;
         let margin_call = s.debt as u128 * 10_000 > locked_value(s, &price) * margin_bps;
-        require!(overdue || margin_call, EconErr::NotLiquidatable);
+        require!(overdue || margin_call, EconErr::NotCollectable);
 
         if overdue && s.cash >= s.debt {
             // the direct debit: repaid at the loan's terms, no penalty, collateral released
@@ -324,10 +324,10 @@ pub mod chain {
             l.principal_repaid += principal;
             l.debt_total -= paid;
             l.supply -= paid;
-            emit!(AutoRepaid { agent, paid, interest, principal, by: ctx.accounts.caller.key() });
+            emit!(Collected { agent, paid, interest, principal });
             return settle_money(
                 &l, &ctx.accounts.mint, &ctx.accounts.vault, &ctx.accounts.token_program,
-                &ledger_key, ctx.bumps.mint, m0,
+                &ledger_key, ctx.bumps.mint, m0, debtor_purse(&ctx.remaining_accounts, agent),
             );
         }
 
@@ -401,13 +401,13 @@ pub mod chain {
         let (written_off, bad_debt) = write_off(&mut l, principal_short);
         l.debt_total -= debt;
         l.supply = l.supply - collected + refund;
-        emit!(Liquidated {
+        emit!(Foreclosed {
             agent, margin_call, debt, penalty, collected, burned, seized, seized_value: value, refund,
-            returned, written_off, bad_debt, by: ctx.accounts.caller.key(),
+            returned, written_off, bad_debt,
         });
         settle_money(
             &l, &ctx.accounts.mint, &ctx.accounts.vault, &ctx.accounts.token_program,
-            &ledger_key, ctx.bumps.mint, m0,
+            &ledger_key, ctx.bumps.mint, m0, debtor_purse(&ctx.remaining_accounts, agent),
         )
     }
 
@@ -696,7 +696,7 @@ pub mod chain {
         emit!(Cleared { good, price, volume, round: l.round });
         if let Some((mint, vault, token_program)) = coin.as_ref() {
             settle_money(&l, mint, vault, token_program,
-                         &ledger_key, mint_bump_for(&ledger_key), m0)?;
+                         &ledger_key, mint_bump_for(&ledger_key), m0, None)?;
         }
         Ok(())
     }
@@ -705,7 +705,7 @@ pub mod chain {
 /// Charge interest for the time held since the loan was last touched: simple interest
 /// on the principal, `rate_bps` per `rate_period_slots`, pro rata by slot (rounded
 /// down). It is added to the debt (and `debt_total`); it becomes the bank's income only
-/// when paid. Called before every borrow, repay and liquidate, so `debt` is exact at
+/// when paid. Called before every borrow, repay and collect, so `debt` is exact at
 /// those points; between them, `accruedDebt` in chain.mjs computes it for any slot.
 fn accrue(l: &mut Ledger, agent: usize, now: u64) -> Result<u64> {
     let (rate, period) = (l.rate_bps as u128, l.rate_period_slots as u128);
@@ -769,6 +769,13 @@ fn token_ix(tag: u8, args: &[u8], accounts: Vec<AccountMeta>) -> Instruction {
     Instruction { program_id: TOKEN_PROGRAM_ID, accounts, data }
 }
 
+/// The debtor's purse, if the caller handed one in. It rides as a remaining account, so
+/// nothing in the instruction's data or its `Accounts` changed and an older caller that
+/// sends none still works (see `fund_burn`).
+fn debtor_purse<'a, 'i>(rest: &'a [AccountInfo<'i>], agent: u16) -> Option<(&'a AccountInfo<'i>, u16)> {
+    rest.first().map(|purse| (purse, agent))
+}
+
 /// What the books say about money, before and after an instruction: coins ever created,
 /// and coins ever destroyed. The difference across an instruction is what the mint must
 /// do — so the token follows the economics instead of restating it.
@@ -799,6 +806,7 @@ fn settle_money<'i>(
     ledger_key: &Pubkey,
     bump: u8,
     before: (u64, u64),
+    source: Option<(&AccountInfo<'i>, u16)>,
 ) -> Result<()> {
     require_keys_eq!(*token_program.key, TOKEN_PROGRAM_ID, EconErr::BadMint);
     let (minted_now, destroyed_now) = money(l);
@@ -808,9 +816,61 @@ fn settle_money<'i>(
         mint_coins(mint, vault, token_program, ledger_key, bump, created)?;
     }
     if destroyed > 0 {
+        // The coins the burn destroys belong to `source`, so bring them home first.
+        let want = source.map_or(0, |(_, agent)| l.slots[agent as usize].cash);
+        fund_burn(source, want, vault, token_program, ledger_key, destroyed)?;
         burn_coins(mint, vault, token_program, ledger_key, bump, destroyed)?;
     }
     check_supply(l, mint)
+}
+
+/// Bring the coins a burn is about to destroy into the vault, out of the purse that
+/// actually holds them.
+///
+/// Burning takes coins out of the vault, but the vault's own balance is only ever the
+/// bank's cash: every other SETTLER in existence sits in an agent's purse (`settle_cash`).
+/// The coins a repayment or a foreclosure destroys are the DEBTOR's — they left that
+/// agent's `cash` a few lines above — so the burn was asking the bank to front them, and
+/// once the bank's cash had been eaten by write-offs the vault was empty and the SPL burn
+/// failed with "insufficient funds". Long runs reached that state and then every
+/// foreclosure reverted, so the keeper could never clear the overdue loan.
+///
+/// So: before burning, move what the vault is short out of the debtor's purse. Nothing
+/// about the economy changes — the debtor's `cash` has already been reduced by at least
+/// this much, and `settle_cash` would have moved exactly these coins at the end of the
+/// round anyway. This only moves them a few seconds earlier, from the account that holds
+/// them to the account the burn reads.
+///
+/// `source` is optional and the purse is a remaining account, so a caller that passes
+/// nothing behaves exactly as before. The purse is checked against its PDA, so no other
+/// account can be drained; the bump is derived here rather than taken on trust.
+fn fund_burn<'i>(
+    source: Option<(&AccountInfo<'i>, u16)>,
+    cash: u64,
+    vault: &AccountInfo<'i>,
+    token_program: &AccountInfo<'i>,
+    ledger_key: &Pubkey,
+    need: u64,
+) -> Result<()> {
+    let Some((purse, agent)) = source else { return Ok(()) };
+    let index = agent.to_le_bytes();
+    let (want, bump) =
+        Pubkey::find_program_address(&[PURSE_SEED, ledger_key.as_ref(), &index], &crate::ID);
+    require_keys_eq!(*purse.key, want, EconErr::BadPurse);
+    // A village whose purses were never created (the token-level tests) simply has
+    // nothing to draw on: then this does nothing and the burn behaves as it always did.
+    let held = token_amount(purse).unwrap_or(0);
+    // Two claims on this purse, and the larger wins.
+    //  - `surplus`: coins it is holding that the ledger no longer says are this agent's,
+    //    because the instruction just took them (the debt, the penalty, the interest). They
+    //    belong in the vault whether or not this burn needs them. Leaving them behind was
+    //    what made the vault drift below the bank's cash, so that the NEXT foreclosure in
+    //    the same round found it short even though its own debtor was good for it.
+    //  - `short`: what the burn is still missing after the vault's own balance.
+    let surplus = held.saturating_sub(cash);
+    let short = need.saturating_sub(token_amount(vault)?);
+    let take = surplus.max(short).min(held);
+    transfer_coins(purse, vault, token_program, ledger_key, agent, bump, take)
 }
 
 /// MintTo: mint (w), destination (w), authority (s) — the mint signs for itself.
@@ -1080,9 +1140,9 @@ pub struct Borrowed { pub agent: u16, pub amount: u64, pub debt: u64, pub accrue
 #[event]
 pub struct Repaid { pub agent: u16, pub paid: u64, pub interest: u64, pub principal: u64, pub forgiven: u64 }
 #[event]
-pub struct AutoRepaid { pub agent: u16, pub paid: u64, pub interest: u64, pub principal: u64, pub by: Pubkey }
+pub struct Collected { pub agent: u16, pub paid: u64, pub interest: u64, pub principal: u64 }
 #[event]
-pub struct Liquidated {
+pub struct Foreclosed {
     pub agent: u16,
     pub margin_call: bool,
     pub debt: u64,
@@ -1095,7 +1155,6 @@ pub struct Liquidated {
     pub returned: [u32; N_GOODS],
     pub written_off: u64,
     pub bad_debt: u64,
-    pub by: Pubkey,
 }
 #[event]
 pub struct DividendPaid { pub per_agent: u64, pub total: u64, pub equity_left: i64, pub by: Pubkey }
@@ -1153,22 +1212,6 @@ pub struct ClearAuction<'info> {
     pub token_program: Option<UncheckedAccount<'info>>,
 }
 
-/// Permissionless, and it burns coins: foreclosure. Any signer, plus the mint.
-#[derive(Accounts)]
-pub struct AnyoneMint<'info> {
-    #[account(mut)]
-    pub ledger: AccountLoader<'info, Ledger>,
-    pub caller: Signer<'info>,
-    /// CHECK: the SETTLERS mint, validated by its seeds.
-    #[account(mut, seeds = [MINT_SEED, ledger.key().as_ref()], bump)]
-    pub mint: UncheckedAccount<'info>,
-    /// CHECK: the vault, validated by its seeds.
-    #[account(mut, seeds = [VAULT_SEED, ledger.key().as_ref()], bump)]
-    pub vault: UncheckedAccount<'info>,
-    /// CHECK: checked by address against TOKEN_PROGRAM_ID.
-    pub token_program: UncheckedAccount<'info>,
-}
-
 /// Creating agents' purses: the authority pays their rent, so it signs.
 /// The purses themselves come in as remaining accounts, one per agent in the batch.
 #[derive(Accounts)]
@@ -1210,8 +1253,8 @@ pub struct Write<'info> {
     pub authority: Signer<'info>,
 }
 
-/// No authority check: foreclosure and dividends are open to anyone. The
-/// instructions themselves check that the rules allow them.
+/// No authority check: the dividend is open to anyone. The instruction
+/// itself checks that the rules allow it.
 #[derive(Accounts)]
 pub struct Anyone<'info> {
     #[account(mut)]
@@ -1290,7 +1333,7 @@ pub enum EconErr {
     #[msg("this agent has no open loan")]
     NoLoan,
     #[msg("the loan is neither overdue nor under its margin")]
-    NotLiquidatable,
+    NotCollectable,
     #[msg("the bank is not lending: credit is switched off")]
     CreditOff,
     #[msg("loan term must be a whole number of term units, from 1 up to the maximum")]
