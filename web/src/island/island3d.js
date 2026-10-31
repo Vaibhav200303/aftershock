@@ -652,7 +652,9 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         // the place card's lineup renders the very same model
         const parts = blobParts();
         this.blobGeo = parts.bodyGeo;
-        this.blobMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0 });
+        this.blobMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38, metalness: 0 });
+        this.jobGeo = parts.jobGeo;
+        this.badgeGeo = parts.badgeGeo;
         this.faceGeo = parts.faceGeo;
 
         const atlas = new THREE.CanvasTexture(parts.atlas);
@@ -904,17 +906,27 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
 
     bindInput() {
       const el = this.renderer.domElement;
-      let dragging = false, px = 0, py = 0;
-      el.addEventListener("pointerdown", (e) => { dragging = true; this._cameraTouched = true; px = e.clientX; py = e.clientY; el.setPointerCapture(e.pointerId); });
+      let dragging = false, px = 0, py = 0, downX=0, downY=0, traveled=0;
+      el.addEventListener("pointerdown", (e) => { dragging = true; downX=e.clientX; downY=e.clientY; traveled=0; this._cameraTouched = true; px = e.clientX; py = e.clientY; el.setPointerCapture(e.pointerId); });
       el.addEventListener("pointermove", (e) => {
         if (!dragging) return;
+        traveled=Math.max(traveled,Math.hypot(e.clientX-downX,e.clientY-downY));
         const o = this.orbit;
         o.ttheta += (e.clientX - px) * 0.006;
         o.tphi = Math.min(1.42, Math.max(0.16, o.tphi + (e.clientY - py) * 0.005));
         px = e.clientX; py = e.clientY;
       });
       const stop = () => { dragging = false; };
-      el.addEventListener("pointerup", stop);
+      el.addEventListener("pointerup", e => {
+        const click=dragging&&traveled<6&&Math.hypot(e.clientX-downX,e.clientY-downY)<6;
+        stop();if(!click||!this.body)return;
+        const rect=el.getBoundingClientRect(),pointer=new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);
+        const ray=new THREE.Raycaster();ray.setFromCamera(pointer,this.camera);
+        this.body.updateMatrixWorld(true);
+        this.body.computeBoundingSphere();
+        const hit=ray.intersectObject(this.body,false)[0];
+        if(hit?.instanceId!=null){const id=[...this.blobs.keys()][hit.instanceId];window.dispatchEvent(new CustomEvent('moku:agent',{detail:id}));}
+      });
       el.addEventListener("pointercancel", stop);
       el.addEventListener("wheel", (e) => {
         e.preventDefault();
@@ -954,7 +966,12 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       };
       this.body = add(this.blobGeo, this.blobMat, n);
       this.body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
-      this.body.castShadow = true;
+      this.body.castShadow = this.body.receiveShadow = true;
+      this.jobBadge = add(this.jobGeo, this.blobMat, n);
+      this.jobBadge.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n*3),3);
+      this.jobBadge.instanceMatrix = this.body.instanceMatrix;
+      const badgeRim=add(this.badgeGeo,this.blobMat,n);
+      badgeRim.instanceMatrix=this.body.instanceMatrix;
       this.face = add(this.faceGeo.clone(), this.faceMat, n);
       this.face.instanceMatrix = this.body.instanceMatrix;
       this.face.geometry.setAttribute("aFace", new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2));
@@ -1029,7 +1046,9 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         M.s.set(zoom * b.girth * wide, zoom * b.tall * tall, zoom * b.girth * wide);
         M.m.compose(M.p, M.q.setFromEuler(M.e), M.s).toArray(mats, i * 16);
         if (b.extra >= 0) M.m.toArray(this.extraMeshes[b.extra].instanceMatrix.array, b.extraAt * 16);
-        const rgb = this.areaRGB.get(b.job.id);          // coloured by job: the market crowd shows who does what
+        const jobRGB=this.areaRGB.get(b.job.id);
+        this.jobBadge.instanceColor.array.set(jobRGB,i*3);
+        const rgb = b.rgb; // Stable personality color; the small badge follows the current job.
         col[i * 3] = rgb[0]; col[i * 3 + 1] = rgb[1]; col[i * 3 + 2] = rgb[2];
         const cell = b.mood * 2 + ((now * 0.001 + b.phase) % b.blinkEvery < 0.13 ? 1 : 0);
         if (faces.array[i * 2] !== cell) { faces.array[i * 2] = cell; faceDirty = true; }
@@ -1038,6 +1057,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         i++;
       }
       this.body.instanceMatrix.needsUpdate = this.body.instanceColor.needsUpdate = true;
+      this.jobBadge.instanceColor.needsUpdate = true;
       for (const m of this.extraMeshes) if (m) m.instanceMatrix.needsUpdate = true;
       if (faceDirty || !this._facesSent) faces.needsUpdate = this._facesSent = true;
       for (let k = 0; k < areas.length; k++) {

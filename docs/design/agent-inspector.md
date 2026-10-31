@@ -1,0 +1,7 @@
+# Agent inspector HUD
+
+Generated `agent-hud-reference.png` with the built-in imagegen tool before authoring the HUD. Prompt: clean ivory parchment agent inspector over a colorful island; deep teal typography and controls, muted gold rules; portrait and personality chip, activity, wellbeing/needs, resources and finances, patience/risk bars, skills, latest thought, decision history. The generated mockup is visual direction; the implemented inspector uses actual API fields only.
+
+Click a dot body to inspect its agent; an accessible Agents list provides another entry point. Short clicks are separated from orbit drags. Instanced mesh bounds are refreshed before picking moving bodies. The inspector consumes the shared state store, fetches `/agent?id=` with cancellation on selection changes, and updates history each round. Appearance is explicitly cosmetic; behavioral patience and risk come from the backend. Missing data, request errors with retry, empty rosters and removed agents have explicit states. Full decisions, action details, journal and memory remain scrollable. Escape closes the non-modal inspector and restores focus. Hide UI hides the inspector too.
+
+Verification: production build and whitespace checks; isolated local browser fixture verified real raycast selection of Mira, roster selection of Nora, backend-shaped profile data, portrait rendering, journal/history and Escape dismissal/focus restoration. No browser errors. Fixture values in `agent-inspector-preview.png` are test data, not a real saved run. Temporary fixture removed after testing.

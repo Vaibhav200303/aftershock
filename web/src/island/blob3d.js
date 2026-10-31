@@ -26,7 +26,7 @@ function build(w, h, dpr) {
 
   const parts = blobParts();
   const who = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0 });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38, metalness: 0 });
   who.add(new THREE.Mesh(parts.bodyGeo, bodyMat));
   const atlas = new THREE.CanvasTexture(parts.atlas);
   atlas.colorSpace = THREE.SRGBColorSpace;
@@ -38,8 +38,11 @@ function build(w, h, dpr) {
     const m = new THREE.Mesh(e.geo, new THREE.MeshStandardMaterial({ color: e.color, roughness: 0.8, metalness: 0 }));
     who.add(m); return m;
   });
+  const jobMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.5});
+  who.add(new THREE.Mesh(parts.badgeGeo,new THREE.MeshStandardMaterial({color:0xfffaf0,roughness:0.6})));
+  who.add(new THREE.Mesh(parts.jobGeo,jobMat));
   scene.add(who);
-  return { renderer, scene, camera, who, bodyMat, atlas, hats, w, h, dpr, color: new THREE.Color() };
+  return { renderer, scene, camera, who, bodyMat, jobMat, atlas, hats, w, h, dpr, color: new THREE.Color() };
 }
 
 // Paint villager `id` into a 2D context of w × h CSS pixels. `yaw` turns them (0 faces the
@@ -52,7 +55,8 @@ export function paintBlob(ctx, { id, mood, blink, color, yaw = 0, breath = 0, w,
   const B = bodyOf(id), R = rig;
   R.who.scale.set(B.girth * (1 + breath * 0.6), B.tall * (1 - breath), B.girth * (1 + breath * 0.6));
   R.who.rotation.set(B.leanX, yaw, B.leanZ);
-  R.bodyMat.color.copy(R.color.set(color));
+  R.bodyMat.color.set(B.color);
+  R.jobMat.color.copy(R.color.set(color));
   R.atlas.offset.set((mood * 2 + (blink ? 1 : 0)) / FACE_COLS, (FACE_LOOKS - 1 - B.look) / FACE_LOOKS);
   R.hats.forEach((m, k) => { m.visible = k === B.extra; });
   R.renderer.render(R.scene, R.camera);

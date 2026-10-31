@@ -9,6 +9,7 @@ import { subscribe, command } from '../store.js';
 import { subscribeActs, subscribeUpdates, subscribeRound, queued } from './pulse.js';
 import { S } from './css.js';
 import { LOCS, bucketOf, ACT_LABEL, SHORT, SKIN, HAIR, SHIRT, KINDS, EMPTY_SIM } from './constants.js';
+import AgentInspector from './AgentInspector.jsx';
 import './island3d.js';   // defines <island-3d>
 import { bodyOf, moodOf, drawBlob } from './blob.js';
 import { paintBlob } from './blob3d.js';
@@ -102,7 +103,7 @@ function BlobFigure({ id, mood, color }) {
     if (!portraitRaf) portraitRaf = requestAnimationFrame(portraitTick);
     return () => { portraits.delete(p); };
   }, [id]);
-  return <canvas ref={ref} style={S(`display: block; width: ${BLOB_W}px; height: ${BLOB_H}px;`)}></canvas>;
+  return <canvas ref={ref} role="img" aria-label={`${bodyOf(id).persona} dot villager`} title={`${bodyOf(id).persona} personality · badge shows current job`} style={S(`display: block; width: ${BLOB_W}px; height: ${BLOB_H}px;`)}></canvas>;
 }
 
 // The lineup. Everyone at the place stands against the wall — a pale flat tint of the place's
@@ -651,6 +652,7 @@ export default class IslandApp extends React.Component {
           </div>
         </footer>
 
+        {!this.state.uiHidden && <AgentInspector />}
         {/* The place card: the big one, flat in the place's own colour, holding the lineup. */}
         {v.selected && (
           <div onClick={v.closeLoc}
