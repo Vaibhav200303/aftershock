@@ -1,4 +1,4 @@
-//! agent-economy — the village ledger and its market, on Solana.
+//! saltmarsh — the village ledger and its market, on Solana.
 //!
 //! The simulation (agent minds, time, movement) runs off-chain. What lives here is
 //! the economy itself: who owns what, and the market that turns orders into a price.
@@ -16,7 +16,7 @@
 //! is the village bank lending them against collateral. Repaying the principal burns
 //! it again; the interest goes to the bank. Every coin agents hold is counted in `supply`.
 //!
-//! Those coins are a real SPL token, SETTLERS, minted by this program and nobody else:
+//! Those coins are a real SPL token, SALT, minted by this program and nobody else:
 //! the mint is a PDA of the ledger and is its own mint authority, so no key that could
 //! sign for it exists. Every coin ever created sits in one vault, also a PDA, and the
 //! mint's supply is checked against the books after every instruction that can move it.
@@ -38,7 +38,7 @@
 //!   minted     = Σ open principal + principal_repaid + written_off + bad_debt
 //!   Σ bank_book = seized_value − sold_book      (and bank_book[g] = 0 exactly when bank.goods[g] = 0)
 //!   debt_total = Σ debt                         (debts as last accrued; see `accrue`)
-//!   SETTLERS supply = Σ agent cash + bank cash   (the SPL mint; see `settle_money`)
+//!   SALT supply = Σ agent cash + bank cash   (the SPL mint; see `settle_money`)
 //!   equity     = bank cash + Σ bank_book − bad_debt
 //!   bad_debt > 0  ⇒  bank cash = 0
 //!   per agent: principal ≤ debt, and debt = 0 ⇒ principal = 0 and nothing locked
@@ -60,15 +60,15 @@ declare_id!("4ruVnoc2xFy5YJ8MAUA85mLn6ALCD4CeWsssr4JmCCWY");
 pub const TOKEN_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
     6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169,
 ]);
-/// SETTLERS has 2 decimals, so one base unit is one cent — the unit `cash` is already in.
+/// SALT has 2 decimals, so one base unit is one cent — the unit `cash` is already in.
 /// No conversion anywhere: `mint.supply` compares directly against `supply + bank.cash`.
-pub const SETTLERS_DECIMALS: u8 = 2;
+pub const SALT_DECIMALS: u8 = 2;
 const MINT_LEN: usize = 82;                  // an SPL mint account
 const TOKEN_ACCOUNT_LEN: usize = 165;        // an SPL token account
 const MINT_SUPPLY_OFFSET: usize = 36;        // mint_authority COption<Pubkey> is 4 + 32 bytes
 const TOKEN_AMOUNT_OFFSET: usize = 64;       // an SPL token account is mint 0..32, owner 32..64, amount 64..72
 /// PDA seeds. The mint is its own authority and the vault's owner.
-pub const MINT_SEED: &[u8] = b"settlers";
+pub const MINT_SEED: &[u8] = b"salt";
 pub const VAULT_SEED: &[u8] = b"vault";
 /// One purse per agent: an SPL token account at `["purse", ledger, agent]` that, like the
 /// mint, is its own owner — so no key that could spend an agent's coins exists anywhere.
@@ -485,7 +485,7 @@ pub mod chain {
         Ok(())
     }
 
-    /// Move real SETTLERS between agents until every purse holds what the ledger says
+    /// Move real SALT between agents until every purse holds what the ledger says
     /// that agent has.
     ///
     /// `settle_money` reconciles the *total* — how many coins exist. This reconciles the
@@ -783,7 +783,7 @@ fn money(l: &Ledger) -> (u64, u64) {
     (l.minted, l.principal_repaid + l.written_off)
 }
 
-/// The SPL mint's own record of how many SETTLERS exist.
+/// The SPL mint's own record of how many SALT exist.
 fn mint_supply(mint: &AccountInfo) -> Result<u64> {
     let data = mint.try_borrow_data()?;
     require!(data.len() >= MINT_LEN, EconErr::BadMint);
@@ -828,7 +828,7 @@ fn settle_money<'i>(
 /// actually holds them.
 ///
 /// Burning takes coins out of the vault, but the vault's own balance is only ever the
-/// bank's cash: every other SETTLER in existence sits in an agent's purse (`settle_cash`).
+/// bank's cash: every other SALT in existence sits in an agent's purse (`settle_cash`).
 /// The coins a repayment or a foreclosure destroys are the DEBTOR's — they left that
 /// agent's `cash` a few lines above — so the burn was asking the bank to front them, and
 /// once the bank's cash had been eaten by write-offs the vault was empty and the SPL burn
@@ -907,7 +907,7 @@ fn burn_coins<'i>(
     Ok(())
 }
 
-/// Every coin the village holds is a SETTLER, and every SETTLER is a coin the village
+/// Every coin the village holds is a SALT, and every SALT is a coin the village
 /// holds. Checked after every instruction that can change either side.
 fn check_supply(l: &Ledger, mint: &AccountInfo) -> Result<()> {
     let want = l.supply.checked_add(l.bank.cash).ok_or(EconErr::Overflow)?;
@@ -915,7 +915,7 @@ fn check_supply(l: &Ledger, mint: &AccountInfo) -> Result<()> {
     Ok(())
 }
 
-/// Create the SETTLERS mint and the vault that holds every coin. Both are PDAs of this
+/// Create the SALT mint and the vault that holds every coin. Both are PDAs of this
 /// ledger, so neither has a private key; the mint is its own mint and freeze authority.
 fn create_coin<'i>(
     authority: &AccountInfo<'i>,
@@ -941,7 +941,7 @@ fn create_coin<'i>(
     )?;
     // InitializeMint2: decimals, mint authority, freeze authority (1-byte option tag)
     let mut args = Vec::with_capacity(1 + 32 + 33);
-    args.push(SETTLERS_DECIMALS);
+    args.push(SALT_DECIMALS);
     args.extend_from_slice(mint.key.as_ref());
     args.push(1);
     args.extend_from_slice(mint.key.as_ref());
@@ -1165,10 +1165,10 @@ pub struct Initialize<'info> {
     pub authority: Signer<'info>,
     #[account(init, payer = authority, space = 8 + std::mem::size_of::<Ledger>())]
     pub ledger: AccountLoader<'info, Ledger>,
-    /// CHECK: the SETTLERS mint, a PDA of this ledger, created and initialized here.
+    /// CHECK: the SALT mint, a PDA of this ledger, created and initialized here.
     #[account(mut, seeds = [MINT_SEED, ledger.key().as_ref()], bump)]
     pub mint: UncheckedAccount<'info>,
-    /// CHECK: the vault that holds every SETTLER, a PDA of this ledger, created here.
+    /// CHECK: the vault that holds every SALT, a PDA of this ledger, created here.
     #[account(mut, seeds = [VAULT_SEED, ledger.key().as_ref()], bump)]
     pub vault: UncheckedAccount<'info>,
     /// CHECK: checked by address against TOKEN_PROGRAM_ID.
@@ -1183,7 +1183,7 @@ pub struct WriteMint<'info> {
     #[account(mut)]
     pub ledger: AccountLoader<'info, Ledger>,
     pub authority: Signer<'info>,
-    /// CHECK: the SETTLERS mint, validated by its seeds.
+    /// CHECK: the SALT mint, validated by its seeds.
     #[account(mut, seeds = [MINT_SEED, ledger.key().as_ref()], bump)]
     pub mint: UncheckedAccount<'info>,
     /// CHECK: the vault, validated by its seeds.
@@ -1202,7 +1202,7 @@ pub struct ClearAuction<'info> {
     #[account(mut)]
     pub ledger: AccountLoader<'info, Ledger>,
     pub authority: Signer<'info>,
-    /// CHECK: the SETTLERS mint, validated by its seeds when present.
+    /// CHECK: the SALT mint, validated by its seeds when present.
     #[account(mut, seeds = [MINT_SEED, ledger.key().as_ref()], bump)]
     pub mint: Option<UncheckedAccount<'info>>,
     /// CHECK: the vault, validated by its seeds when present.
@@ -1220,7 +1220,7 @@ pub struct InitPurses<'info> {
     pub ledger: AccountLoader<'info, Ledger>,
     #[account(mut)]
     pub authority: Signer<'info>,
-    /// CHECK: the SETTLERS mint, validated by its seeds.
+    /// CHECK: the SALT mint, validated by its seeds.
     #[account(seeds = [MINT_SEED, ledger.key().as_ref()], bump)]
     pub mint: UncheckedAccount<'info>,
     /// CHECK: checked by address against TOKEN_PROGRAM_ID.
@@ -1235,7 +1235,7 @@ pub struct SettleCash<'info> {
     #[account(mut)]
     pub ledger: AccountLoader<'info, Ledger>,
     pub authority: Signer<'info>,
-    /// CHECK: the SETTLERS mint, validated by its seeds. Signs for the vault.
+    /// CHECK: the SALT mint, validated by its seeds. Signs for the vault.
     #[account(seeds = [MINT_SEED, ledger.key().as_ref()], bump)]
     pub mint: UncheckedAccount<'info>,
     /// CHECK: the vault, validated by its seeds.
@@ -1342,11 +1342,11 @@ pub enum EconErr {
     Overdue,
     #[msg("arithmetic overflow")]
     Overflow,
-    #[msg("the SETTLERS supply no longer matches the village's books")]
+    #[msg("the SALT supply no longer matches the village's books")]
     SupplyMismatch,
     #[msg("this auction sells the bank's collateral: it must carry the mint and its vault")]
     MintAccountsRequired,
-    #[msg("not this ledger's SETTLERS mint")]
+    #[msg("not this ledger's SALT mint")]
     BadMint,
     #[msg("not this agent's purse for this ledger")]
     BadPurse,

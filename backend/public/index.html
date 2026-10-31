@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>agent-economy</title>
+<title>saltmarsh</title>
 <style>
   body { font: 13px ui-monospace, Menlo, monospace; margin: 16px; background: #fff; color: #111; }
   h1 { font-size: 18px; margin: 0; display: inline; }
@@ -91,7 +91,7 @@
 </style>
 
 <div class="top">
-  <h1>agent-economy</h1>
+  <h1>saltmarsh</h1>
   <a href="/">← Island view</a>
   <button id="btn" onclick="toggle()">…</button>
   <label id="providerpick" class="muted">provider <select id="providersel"></select></label>
@@ -705,8 +705,8 @@ async function refresh() {
     `a round takes ≈${(s.roundMs / 1000).toFixed(1)}s` +
     (s.decide?.timeouts ? ` · <span class="hungry">${s.decide.timeouts} timed out last round</span>` : '') +
     ` · solana: <b>${s.chain.transactions}</b> transactions · <a target="_blank" href="${s.chain.explorer}">ledger ${s.chain.ledger.slice(0, 8)}… ↗</a>` +
-    ` · <a target="_blank" href="${s.chain.mintExplorer}" title="SETTLERS — the mint's authority is itself, a program address: no key that could mint one exists">SETTLERS ${s.chain.mint.slice(0, 8)}… ↗</a>` +
-    (s.chain.settlers != null ? ` (${(s.chain.settlers / 100).toFixed(2)} in existence)` : '') +
+    ` · <a target="_blank" href="${s.chain.mintExplorer}" title="SALT — the mint's authority is itself, a program address: no key that could mint one exists">SALT ${s.chain.mint.slice(0, 8)}… ↗</a>` +
+    (s.chain.salt != null ? ` (${(s.chain.salt / 100).toFixed(2)} in existence)` : '') +
     (s.llm.calls ? ` · llm ${s.llm.calls} calls ($${s.llm.cost.toFixed(3)})` : '') +
     ` · <span class="${s.totals.hungry ? 'hungry' : 'muted'}">hungry ${s.totals.hungry}</span> · <span class="${s.totals.cold ? 'hungry' : 'muted'}">cold ${s.totals.cold}</span>` +
     (s.foreclosures.length ? ` · <span class="hungry">latest foreclosure: r${s.foreclosures[0].round} ${s.foreclosures[0].name}</span>` : '');

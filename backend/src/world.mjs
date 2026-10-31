@@ -101,7 +101,7 @@ export function createWorld(chain, initial, { onEvent = () => {} } = {}) {
     prices: [...initial.lastPrice],
     priceHistory: [], volumes: none(),
     pending: [], seq: 0,                             // seq: arrival order of orders, for price-time priority
-    events: [], roundBusy: false, lastRound: null, lastBook: null, settlersSupply: null,
+    events: [], roundBusy: false, lastRound: null, lastBook: null, saltSupply: null,
     lastLadder: null,                                // last round's book before clearing, per good (D6)
     bankSale: {},                                    // per good: the bank's descending sale of seized goods, { anchor, k }
     slotsPerRound: CFG.ROUND_MS_GUESS / CFG.SLOT_MS, roundMs: CFG.ROUND_MS_GUESS,   // measured every round
@@ -988,10 +988,10 @@ export function createWorld(chain, initial, { onEvent = () => {} } = {}) {
     // already matches moves nothing, so this costs at most one more agent in a chunk.
     for (const o of ops) unsettledPurses.add(o.agent);
     for (const f of overdueLoans) unsettledPurses.add(f.agent);
-    // what the SETTLERS mint itself says exists. The program checks this against the
+    // what the SALT mint itself says exists. The program checks this against the
     // books inside every instruction that can move it, so this is a read, not a guard —
     // and moving coins between purses can't change it, so it is read alongside them.
-    const supplyRead = chain.settlersSupply();
+    const supplyRead = chain.saltSupply();
     if (unsettledPurses.size) {
       try {
         const paid = [...unsettledPurses];
@@ -1019,7 +1019,7 @@ export function createWorld(chain, initial, { onEvent = () => {} } = {}) {
         emit('error', { message: `purses not settled this round: ${e.message}` });
       }
     }
-    W.settlersSupply = await supplyRead;
+    W.saltSupply = await supplyRead;
     mark('purses');
     W.slot = L.slot; W.slotAt = Date.now();
     const fills = none(), trades = [], dgs = [];
@@ -1183,7 +1183,7 @@ export function createWorld(chain, initial, { onEvent = () => {} } = {}) {
                             equity: L.equity, lendingCap: L.lendingCap, capitalRequired: L.capitalRequired, books: L.books,
                             // chain-side sums, so every round's invariants can be checked from the log
                             sumCash: sum(x => x.cash), sumDebt: sum(x => x.debt), sumPrincipal: sum(x => x.principal),
-                            settlers: W.settlersSupply,
+                            salt: W.saltSupply,
                             // every agent: principal ≤ debt, and no debt ⇒ no principal and nothing locked
                             slotsOk: L.slots.every(x => x.principal <= x.debt && (x.debt || (!x.principal && x.locked.every(q => !q)))),
                             goodsTotal: GOODS.map((_, g) => sum(x => x.goods[g] + x.locked[g]) + L.bank.goods[g]), settled,

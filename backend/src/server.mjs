@@ -233,7 +233,7 @@ async function begin({ provider: choice, model, agents, apiKey, islandId='day', 
       termUnitSlots: 1, maxTermUnits: 65_535, equityFloor: Math.round(B.EQUITY_FLOOR * money),
     });
   // Every agent gets a purse: an SPL token account of their own, so the coins they earn
-  // and spend are real SETTLERS moving between real addresses, not a number in our ledger.
+  // and spend are real SALT moving between real addresses, not a number in our ledger.
   await chain.initPurses(CFG.AGENTS);
   await chain.settleCash(Array.from({ length: CFG.AGENTS }, (_, i) => i));
 
@@ -259,7 +259,7 @@ async function begin({ provider: choice, model, agents, apiKey, islandId='day', 
   await saveCheckpoint();
   console.log(`logging to ${path.relative(ROOT, dir)}/`);
   console.log(`\nstarted   provider=${brain.name}   agents=${CFG.AGENTS}   ledger ${chain.ledger.publicKey.toBase58()}`);
-  console.log(`SETTLERS  ${chain.mint.toBase58()}   (mint authority: itself — no key for it exists)`);
+  console.log(`SALT  ${chain.mint.toBase58()}   (mint authority: itself — no key for it exists)`);
 
   const alive = () => sim && sim.gen === myGen && !sim.stopping;
   // One agent's turn: its brain decides, and the round waits up to DECIDE_TIMEOUT_MS — or
@@ -423,7 +423,7 @@ async function finishStop(s, reason) {
     stoppedAt: new Date().toISOString(), rounds: s.W.round, transactions: s.chain.txCount(),
     policy: s.W.policyLog,          // every dial pulled, and the round it landed on
     llm: s.brain.stats(), chain: L,
-    mint: s.chain.mint.toBase58(), settlersSupply: await s.chain.settlersSupply(),
+    mint: s.chain.mint.toBase58(), saltSupply: await s.chain.saltSupply(),
   }, null, 2));
   console.log(`saved ${path.relative(ROOT, s.dir)}/`);
   console.log(`stopped after ${s.W.round} rounds, ${s.chain.txCount()} transactions`);
@@ -474,7 +474,7 @@ function state() {
     chain: { program: PROGRAM_ID.toBase58(), ledger: chain.ledger.publicKey.toBase58(),
              explorer: explorer('address', chain.ledger.publicKey.toBase58()),
              mint: chain.mint.toBase58(), mintExplorer: explorer('address', chain.mint.toBase58()),
-             settlers: W.settlersSupply,
+             salt: W.saltSupply,
              transactions: chain.txCount(), lastRound: W.lastRound },
     llm: brain.stats(),
     agents: W.agents.map(a => ({
@@ -721,8 +721,8 @@ if (CFG.RUN_SECONDS || CFG.RUN_ROUNDS) {
     ['bad debt ⇒ bank cash 0', !b.badDebt || !L.bank.cash],
     ['per agent: principal ≤ debt; no debt ⇒ nothing owed or locked', L.slots.every(x => x.principal <= x.debt && (x.debt || (!x.principal && !lockedValue(x, L.lastPrice))))],
   ];
-  const settlers = await chain.settlersSupply();
-  inv.push(['SETTLERS supply = Σ cash + bank cash', settlers === cash + L.bank.cash]);
+  const salt = await chain.saltSupply();
+  inv.push(['SALT supply = Σ cash + bank cash', salt === cash + L.bank.cash]);
   // What the agents' own purses actually hold. settle_cash proves this inside the program
   // on every pass; reading it back here is the same claim made from outside.
   const held = [];
@@ -731,9 +731,9 @@ if (CFG.RUN_SECONDS || CFG.RUN_ROUNDS) {
   inv.push(['every agent purse = that agent\'s cash',
     held.every((x, i) => x === L.slots[i].cash)]);
   console.log(`\ninvariants: ${inv.map(([k, v]) => `${k} ${ok(v)}`).join('; ')}`);
-  console.log(`SETTLERS ${chain.mint.toBase58()}: ${coins(settlers)} in existence, all of it minted by the bank's rules`);
+  console.log(`SALT ${chain.mint.toBase58()}: ${coins(salt)} in existence, all of it minted by the bank's rules`);
   console.log(`purses: ${coins(purseTotal)} held by ${CFG.AGENTS} agents in token accounts of their own, ` +
-    `${coins(settlers - purseTotal)} in the bank's vault`);
+    `${coins(salt - purseTotal)} in the bank's vault`);
   console.log(`bank: equity ${coins(L.equity)} (seed ${coins(b.bankSeed)}), lending cap ${coins(L.lendingCap)}, interest ${coins(b.interestIncome)}, ` +
     `penalties ${coins(b.penalties)}, recovered ${coins(b.recovered)}, refunds ${coins(b.refunds)}, written off ${coins(b.writtenOff)}, bad debt ${coins(b.badDebt)}; ` +
     `${W.autoRepaid} collected at the deadline, ${W.overdue} foreclosed overdue`);

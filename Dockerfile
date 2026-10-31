@@ -1,6 +1,6 @@
 # The hosted site: one container that serves the island and the dashboard, runs the village,
 # and starts a Solana validator of its own for each run (server.mjs, MANAGED_VALIDATOR).
-#   docker build -t settlers . && docker run -p 8787:8787 settlers
+#   docker build -t saltmarsh . && docker run -p 8787:8787 saltmarsh
 FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates bzip2 python3 procps \

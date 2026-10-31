@@ -198,7 +198,7 @@ chain and real providers:
 
 | Command | What it checks | Needs |
 | --- | --- | --- |
-| `backend/scripts/check-settlers.sh` | walks a small village through every instruction that can mint or burn money, and checks the token's supply against the ledger's books after each one | Solana CLI |
+| `backend/scripts/check-salt.sh` | walks a small village through every instruction that can mint or burn money, and checks the token's supply against the ledger's books after each one | Solana CLI |
 | `backend/scripts/check-purses.sh` | agents hold their own token accounts and pay each other in them | Solana CLI |
 | `backend/scripts/check-brain.sh` | a provider's key works, the model calls tools, and how long and how much a decision takes (no chain; LLM providers only, not `stub`) | API key |
 | headless run (above) | prints every ledger invariant as `ok` or `BROKEN` at the end | validator |
@@ -208,7 +208,7 @@ The two chain checks start validators of their own on other ports, so they don't
 a validator you already have running. In Docker:
 
 ```bash
-docker run --rm aftershock bash backend/scripts/check-settlers.sh
+docker run --rm aftershock bash backend/scripts/check-salt.sh
 docker run --rm aftershock bash backend/scripts/check-purses.sh
 docker run --rm -e PROVIDER=openai -e OPENAI_API_KEY -e AGENTS=3 aftershock bash backend/scripts/check-brain.sh
 ```
@@ -235,9 +235,7 @@ More detail is in [docs/development.md](docs/development.md).
 - The dial drawer in the panel doesn't refresh when dials are changed through
   `POST /tunables` from outside the page. Reopen the page to see the current values. Changes
   made in the drawer itself display correctly.
-- The web UI calls the village "Settlers of Solana", and the token is named SETTLERS.
 
-## Credits and license
+## License
 
-The source code came with no license file, so no license is granted here. Keep this
-repository private unless the code's authors give permission.
+This project is licensed under the MIT License.

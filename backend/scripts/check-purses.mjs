@@ -1,4 +1,4 @@
-// Do agents really hold their own SETTLERS, and really pay each other in them?
+// Do agents really hold their own SALT, and really pay each other in them?
 //
 // Every coin in the village sits in some agent's purse or the bank's vault, and an
 // auction settles as transfers between the villagers who traded — not as a number we
@@ -31,7 +31,7 @@ const TERMS = {
   kappaBps: 1000, marginBps: 8000, termUnitSlots: TERM_UNIT_SLOTS, maxTermUnits: 3, equityFloor: 0,
 };
 const BANK_SEED = 1800;
-// The suite's own opening prices, for the same reason check-settlers.mjs pins its own:
+// The suite's own opening prices, for the same reason check-salt.mjs pins its own:
 // the collateral and order sizes below are calibrated against these.
 const PRICES = [100, 100, 3000, 1500, 12000];  // food, wood, nets, labour, houses
 const ALL = Array.from({ length: AGENTS }, (_, i) => i);
@@ -54,7 +54,7 @@ async function purseInvariant(after) {
   const off = ALL.filter(i => held[i] !== L.slots[i].cash);
   ok(`every purse matches the books after ${after}`, off.length === 0,
      off.map(i => `agent ${i}: purse ${held[i]} vs cash ${L.slots[i].cash}`).join(', '));
-  const [vault, supply] = [await vaultBalance(), await C.settlersSupply()];
+  const [vault, supply] = [await vaultBalance(), await C.saltSupply()];
   const total = held.reduce((a, b) => a + b, 0) + vault;
   ok(`purses + the bank are the whole supply after ${after}`, total === supply,
      `${total} held, ${supply} exists`);
@@ -80,7 +80,7 @@ for (const i of [0, AGENTS - 1]) {
   const acct = await C.conn.getAccountInfo(C.purseOf(i), 'confirmed');
   ok(`agent ${i} has a purse`, !!acct);
   eq(`agent ${i} purse is a token account`, acct.data.length, 165);
-  ok(`agent ${i} purse holds SETTLERS`, new PublicKey(acct.data.subarray(0, 32)).equals(C.mint));
+  ok(`agent ${i} purse holds SALT`, new PublicKey(acct.data.subarray(0, 32)).equals(C.mint));
   ok(`agent ${i} purse owns itself — no key can spend it`,
      new PublicKey(acct.data.subarray(32, 64)).equals(C.purseOf(i)));
 }

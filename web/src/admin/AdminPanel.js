@@ -877,8 +877,8 @@ function render(s, error) {
     `round ${(s.roundMs / 1000).toFixed(1)}s` +
     (s.decide?.timeouts ? ` · <span class="hungry">${s.decide.timeouts} timed out</span>` : '') +
     ` · <b>${s.chain.transactions}</b> tx · <a target="_blank" href="${s.chain.explorer}">ledger ${s.chain.ledger.slice(0, 8)}… ↗</a>` +
-    ` · <a target="_blank" href="${s.chain.mintExplorer}" title="SETTLERS. The mint's authority is itself, a program address, so no key can mint one.">SETTLERS ${s.chain.mint.slice(0, 8)}… ↗</a>` +
-    (s.chain.settlers != null ? ` ${(s.chain.settlers / 100).toFixed(2)}` : '') +
+    ` · <a target="_blank" href="${s.chain.mintExplorer}" title="SALT. The mint's authority is itself, a program address, so no key can mint one.">SALT ${s.chain.mint.slice(0, 8)}… ↗</a>` +
+    (s.chain.salt != null ? ` ${(s.chain.salt / 100).toFixed(2)}` : '') +
     (s.llm.calls ? ` · llm ${s.llm.calls} calls $${s.llm.cost.toFixed(3)}` : '') +
     ` · <span class="${s.totals.hungry ? 'hungry' : 'muted'}">hungry ${s.totals.hungry}</span> · <span class="${s.totals.cold ? 'hungry' : 'muted'}">cold ${s.totals.cold}</span>` +
     (s.foreclosures.length ? ` · <span class="hungry">foreclosure r${s.foreclosures[0].round} ${s.foreclosures[0].name}</span>` : '') +

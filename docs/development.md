@@ -119,7 +119,7 @@ There is no unit-test runner. Use the checks below, from cheapest to most thorou
 ```bash
 npm --prefix web run build                         # frontend compiles
 PROVIDER=openai AGENTS=3 backend/scripts/check-brain.sh # an LLM provider answers with tool calls (not for stub)
-backend/scripts/check-settlers.sh                  # token supply matches the books after every money-moving instruction
+backend/scripts/check-salt.sh                  # token supply matches the books after every money-moving instruction
 backend/scripts/check-purses.sh                    # agents hold and pay in their own token accounts
 RUN_ROUNDS=20 AGENTS=10 PROVIDER=stub OPEN_BROWSER=0 npm start   # needs a validator: prints every ledger invariant
 ```
