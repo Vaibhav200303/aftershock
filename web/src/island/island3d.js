@@ -8,6 +8,7 @@
 //     have not already moved on an event of their own.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import {plushMaterial} from './plushMaterial.js';
 import { createRenderQuality } from './renderQuality.js';
 import { addDaylight, SUN_DIRECTION, DAYLIGHT } from './daylight.js';
 import { addStrategyVillage } from './strategyVillage.js';
@@ -652,7 +653,9 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         // the place card's lineup renders the very same model
         const parts = blobParts();
         this.blobGeo = parts.bodyGeo;
-        this.blobMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38, metalness: 0 });
+        this.blobMat = plushMaterial();
+        this.eyeGeo = parts.eyeGeo;
+        this.furGeo = parts.furGeo;this.specsGeo = parts.specsGeo;
         this.jobGeo = parts.jobGeo;
         this.badgeGeo = parts.badgeGeo;
         this.faceGeo = parts.faceGeo;
@@ -967,6 +970,10 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       this.body = add(this.blobGeo, this.blobMat, n);
       this.body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
       this.body.castShadow = this.body.receiveShadow = true;
+      this.eyes = add(this.eyeGeo,new THREE.MeshStandardMaterial({color:0x101014,roughness:.38}),n);
+      this.fur=add(this.furGeo,new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,transparent:true,opacity:.5,side:THREE.DoubleSide,depthWrite:false}),n);
+      this.fur.instanceMatrix=this.body.instanceMatrix;this.fur.instanceColor=this.body.instanceColor;
+      this.specs=add(this.specsGeo,new THREE.MeshStandardMaterial({color:0x18171b,roughness:.65}),n);
       this.jobBadge = add(this.jobGeo, this.blobMat, n);
       this.jobBadge.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n*3),3);
       this.jobBadge.instanceMatrix = this.body.instanceMatrix;
@@ -1050,7 +1057,14 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         this.jobBadge.instanceColor.array.set(jobRGB,i*3);
         const rgb = b.rgb; // Stable personality color; the small badge follows the current job.
         col[i * 3] = rgb[0]; col[i * 3 + 1] = rgb[1]; col[i * 3 + 2] = rgb[2];
-        const cell = b.mood * 2 + ((now * 0.001 + b.phase) % b.blinkEvery < 0.13 ? 1 : 0);
+        const blink=(now * 0.001 + b.phase) % b.blinkEvery < 0.13;
+        const eyeLocal=this._eyeLocal||(this._eyeLocal=new THREE.Matrix4());
+        eyeLocal.makeScale(1,blink?.07:1,1);eyeLocal.setPosition(0,.76,0);
+        const eyeWorld=this._eyeWorld||(this._eyeWorld=new THREE.Matrix4());
+        eyeWorld.multiplyMatrices(M.m,eyeLocal).toArray(this.eyes.instanceMatrix.array,i*16);
+        if(b.look===2)M.m.toArray(this.specs.instanceMatrix.array,i*16);
+        else {eyeLocal.makeScale(0,0,0);eyeWorld.multiplyMatrices(M.m,eyeLocal).toArray(this.specs.instanceMatrix.array,i*16);}
+        const cell = b.mood * 2 + (blink?1:0);
         if (faces.array[i * 2] !== cell) { faces.array[i * 2] = cell; faceDirty = true; }
         faces.array[i * 2 + 1] = FACE_LOOKS - 1 - b.look;
         if (!b.path.length) this.areaById.get(dest.id).count++;
@@ -1058,6 +1072,8 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       }
       this.body.instanceMatrix.needsUpdate = this.body.instanceColor.needsUpdate = true;
       this.jobBadge.instanceColor.needsUpdate = true;
+      this.eyes.instanceMatrix.needsUpdate = true;
+      this.specs.instanceMatrix.needsUpdate = true;
       for (const m of this.extraMeshes) if (m) m.instanceMatrix.needsUpdate = true;
       if (faceDirty || !this._facesSent) faces.needsUpdate = this._facesSent = true;
       for (let k = 0; k < areas.length; k++) {

@@ -2,12 +2,12 @@
 // island3d.js builds the instanced 3D bodies
 // from it (an instanced lathe, a canvas face atlas, hats); the place card's lineup draws the
 // same villager flat, from the same id — same build, same features, same hat, same mood.
-import { SplineCurve, Vector2, LatheGeometry, CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, Color } from 'three';
+import { SplineCurve, Vector2, LatheGeometry, CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, Color, BufferGeometry, Float32BufferAttribute, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // the dot's rounded silhouette, [radius, height] from the ground up; the lathe turns it, the lineup mirrors it
-export const BLOB_PROFILE = [[0,0],[0.22,0.04],[0.4,0.15],[0.53,0.35],[0.58,0.6],
-  [0.53,0.85],[0.4,1.05],[0.22,1.16],[0,1.2]];
+export const BLOB_PROFILE = [[0,0],[0.3,0.025],[0.49,0.10],[0.59,0.30],[0.61,0.56],
+  [0.55,0.80],[0.40,1.01],[0.22,1.10],[0,1.13]];
 
 export const rand = (id, salt) => { const v = Math.sin((id + 1) * (12.9898 + salt * 17.31)) * 43758.5453; return v - Math.floor(v); };
 
@@ -18,18 +18,18 @@ export const FACE_CELL = 128, FACE_LOOKS = 6, FACE_COLS = 12;
 export const HAPPY = 0, GRIN = 1, NEUTRAL = 2, WORRIED = 3, SAD = 4, DECIDING = 5;
 // plain, wide-eyed, spectacled, rosy and close-set, heavy-browed
 export const LOOKS = [
-  {dx:25,r:8.5,oval:true}, {dx:30,r:11.5}, {dx:26,r:7.5,specs:true},
-  {dx:24,r:9.5,blush:true}, {dx:26,r:8.5,brows:true}, {dx:25,r:8.5,specs:true,square:true}
+  {dx:25,r:8.5,oval:true}, {dx:27,r:8.5,oval:true}, {dx:26,r:7.5,specs:true},
+  {dx:24,r:9.5,blush:true}, {dx:26,r:8.5,oval:true}, {dx:25,r:8.5,oval:true}
 ];
 export const DOT_PERSONAS = [
-  {name:'Calm',color:'#91cdb2',look:0,extra:-1},
-  {name:'Curious',color:'#8fc4e8',look:1,extra:0},
-  {name:'Thoughtful',color:'#b4a4df',look:2,extra:-1},
-  {name:'Sunny',color:'#efbf86',look:3,extra:1},
-  {name:'Bold',color:'#e99b94',look:4,extra:3},
-  {name:'Playful',color:'#e4d389',look:5,extra:2}
+  {name:'Calm',color:'#f3eee8',look:0,extra:-1},
+  {name:'Curious',color:'#35c9bd',look:1,extra:1},
+  {name:'Thoughtful',color:'#f3c83c',look:2,extra:-1},
+  {name:'Sunny',color:'#f78b2d',look:3,extra:4},
+  {name:'Bold',color:'#3296ed',look:4,extra:3},
+  {name:'Playful',color:'#f073b0',look:5,extra:2}
 ];
-export function drawFace(g, mood, look, blink) {
+export function drawFace(g, mood, look, blink, raisedEyes=false) {
   const L = LOOKS[look], cx = FACE_CELL / 2, ey = 44;
   const gaze = mood === DECIDING ? [4, -5] : [0, 0];
   g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = g.fillStyle = "#0b0b0d";
@@ -37,10 +37,12 @@ export function drawFace(g, mood, look, blink) {
   [-1, 1].forEach(s => {
     const x = cx + s * L.dx;
     g.beginPath();
+    if(!raisedEyes) {
     if (blink) { g.lineWidth = 4.5; g.moveTo(x - L.r, ey + 1); g.lineTo(x + L.r, ey + 1); g.stroke(); }
     else { g.ellipse(x+gaze[0],ey+gaze[1],L.r,L.oval?L.r*1.35:L.r,0,0,Math.PI*2);g.fill();
       g.fillStyle='#fffaf0';g.beginPath();g.arc(x+gaze[0]-L.r*0.24,ey+gaze[1]-L.r*0.3,2.2,0,Math.PI*2);g.fill();g.fillStyle='#0b0b0d'; }
-    if (L.specs) { g.lineWidth = 4; g.beginPath(); if(L.square) g.roundRect(x-18,ey-15,36,30,6);else g.arc(x,ey,18,0,Math.PI*2); g.stroke(); }
+    }
+    if (L.specs && !raisedEyes) { g.lineWidth = 4; g.beginPath(); if(L.square) g.roundRect(x-18,ey-15,36,30,6);else g.arc(x,ey,18,0,Math.PI*2); g.stroke(); }
     // brows: the heavy-browed always wear them; trouble puts them on everyone, inner ends up
     const tilt = mood === WORRIED || mood === SAD ? 7 : mood === DECIDING ? -3 * s : 0;
     if (L.brows || tilt) {
@@ -49,7 +51,7 @@ export function drawFace(g, mood, look, blink) {
       g.beginPath(); g.moveTo(x - s * 11, by - tilt); g.lineTo(x + s * 11, by + (tilt > 0 ? 2 : 0)); g.stroke();
     }
   });
-  if (L.specs) { g.lineWidth = 4; g.beginPath(); g.moveTo(cx - L.dx + 17, ey); g.lineTo(cx + L.dx - 17, ey); g.stroke(); }
+  if (L.specs && !raisedEyes) { g.lineWidth = 4; g.beginPath(); g.moveTo(cx - L.dx + 17, ey); g.lineTo(cx + L.dx - 17, ey); g.stroke(); }
   g.lineWidth = 5.5;
   g.beginPath();
   if (mood === HAPPY) { g.arc(cx, 70, 15, Math.PI * 0.14, Math.PI * 0.86); g.stroke(); }
@@ -75,7 +77,7 @@ export const bodyOf = id => {
   if(identities.has(id)) return identities.get(id);
   const persona=DOT_PERSONAS[Math.floor(rand(id,22)*DOT_PERSONAS.length)];
   const rgb=new Color(persona.color);
-  const identity={tall:0.95+rand(id,20)*0.1,girth:0.95+rand(id,21)*0.1,
+  const identity={tall:0.93+rand(id,20)*0.13,girth:0.96+rand(id,21)*0.12,
     leanX:(rand(id,24)-0.5)*0.06,leanZ:(rand(id,25)-0.5)*0.08,
     look:persona.look,extra:persona.extra,color:persona.color,persona:persona.name,rgb:[rgb.r,rgb.g,rgb.b],
     phase:rand(id,26)*6.283,aside:(rand(id,27)-0.5)*0.6,blinkEvery:2.8+rand(id,28)*3};
@@ -104,28 +106,51 @@ export function blobParts() {
     g.save();
     g.translate((mood * 2 + blink) * FACE_CELL, look * FACE_CELL);
     g.beginPath(); g.rect(0, 0, FACE_CELL, FACE_CELL); g.clip();
-    drawFace(g, mood, look, blink);
+    drawFace(g, mood, look, blink, true);
     g.restore();
   }
 
   const at = (geo, x, y, z, rz = 0, sx = 1, sy = 1, sz = 1) => geo.scale(sx, sy, sz).rotateZ(rz).translate(x, y, z);
   const extras = [
-    { color: 0x5fae3b, geo: mergeGeometries([                         // a sprout
-      at(new CylinderGeometry(0.016, 0.02, 0.16, 6), 0, 1.27, 0),
-      at(new SphereGeometry(0.1, 8, 6), 0.09, 1.37, 0, 0.5, 1, 0.22, 0.5),
-      at(new SphereGeometry(0.1, 8, 6), -0.09, 1.37, 0, -0.5, 1, 0.22, 0.5)]) },
-    { color: 0xe2c275, geo: mergeGeometries([                         // a straw hat
-      at(new CylinderGeometry(0.43, 0.45, 0.035, 18), 0, 1.13, 0),
-      at(new CylinderGeometry(0.23, 0.29, 0.15, 16), 0, 1.21, 0)]) },
-    { color: 0xd8434f, geo: mergeGeometries([                         // a bow
-      at(new ConeGeometry(0.075, 0.14, 8), 0.07, 1.23, 0, Math.PI / 2),
-      at(new ConeGeometry(0.075, 0.14, 8), -0.07, 1.23, 0, -Math.PI / 2),
-      at(new SphereGeometry(0.04, 8, 6), 0, 1.23, 0)]) },
-    { color:0x3b6575, geo:at(new TorusGeometry(0.385,0.045,6,24).rotateX(Math.PI/2),0,1.04,0) },
+    {color:0x70bd30,geo:mergeGeometries([
+      at(new CylinderGeometry(.025,.03,.18,8),0,1.19,0),
+      at(new SphereGeometry(.16,12,8),.12,1.31,0,.55,1,.38,.55),
+      at(new SphereGeometry(.16,12,8),-.12,1.31,0,-.55,1,.38,.55)])},
+    {color:0x2855b9,geo:mergeGeometries([
+      at(new SphereGeometry(.43,20,12,0,Math.PI*2,0,Math.PI/2),0,1.04,0,0,1,.65,1),
+      at(new SphereGeometry(.39,16,8),.15,1.05,.30,-.08,1.15,.09,.8)])},
+    {color:0xe73588,geo:mergeGeometries([
+      at(new SphereGeometry(.22,14,10),.17,1.15,.03,.45,1,.62,.55),
+      at(new SphereGeometry(.22,14,10),-.17,1.15,.03,-.45,1,.62,.55),
+      at(new SphereGeometry(.10,12,8),0,1.15,.12)])},
+    {color:0x232126,geo:mergeGeometries([
+      at(new SphereGeometry(.50,20,12),-.09,1.07,0,.18,1.05,.25,.88),
+      at(new CylinderGeometry(.03,.04,.10,8),-.12,1.23,0,.2)])},
+    {color:0xfff5de,geo:mergeGeometries(Array.from({length:5},(_,i)=>{
+      const a=i/5*Math.PI*2;return at(new SphereGeometry(.105,12,8),-.27+Math.cos(a)*.12,1.04+Math.sin(a)*.12,.33,a,1,.65,.55);
+    }))}
   ];
-  const jobGeo=new SphereGeometry(0.115,10,8);jobGeo.translate(0,0.23,0.54);
-  const badgeGeo=new SphereGeometry(0.15,10,8);badgeGeo.translate(0,0.23,0.46);
-  return (PARTS = { bodyGeo, faceGeo, atlas: g.canvas, extras, jobGeo, badgeGeo });
+  const eyeGeo=mergeGeometries([-1,1].map(side=>at(new SphereGeometry(1,12,10),side*.205,0,.53,0,.052,.092,.048)));
+  const specsGeo=mergeGeometries([
+    ...[-1,1].map(side=>at(new TorusGeometry(.125,.016,7,22),side*.205,.76,.585)),
+    at(new CylinderGeometry(.014,.014,.17,7),0,.76,.585,Math.PI/2)
+  ]);
+  // Fine short fibers add a soft silhouette, shared and instanced like the body.
+  const fibers=[];
+  for(let i=0;i<1100;i++){
+    const t=rand(i,71)*(prof.length-2)+.5,j=Math.floor(t),f=t-j;
+    const a=prof[j],b=prof[j+1],r=a.x+(b.x-a.x)*f,y=a.y+(b.y-a.y)*f,ang=rand(i,72)*Math.PI*2;
+    const p=new Vector3(Math.sin(ang)*r,y,Math.cos(ang)*r);
+    const n=new Vector3(Math.sin(ang),-(b.x-a.x)/Math.max(.001,b.y-a.y),Math.cos(ang)).normalize();
+    const tangent=new Vector3(Math.cos(ang),0,-Math.sin(ang));
+    const left=p.clone().addScaledVector(tangent,-.002),right=p.clone().addScaledVector(tangent,.002);
+    const tip=p.clone().addScaledVector(n,.012+rand(i,73)*.012).addScaledVector(tangent,.005);
+    fibers.push(...left.toArray(),...right.toArray(),...tip.toArray());
+  }
+  const furGeo=new BufferGeometry();furGeo.setAttribute('position',new Float32BufferAttribute(fibers,3));furGeo.computeVertexNormals();
+  const jobGeo=new SphereGeometry(0.075,10,8);jobGeo.translate(0,0.18,0.49);
+  const badgeGeo=new SphereGeometry(0.095,10,8);badgeGeo.translate(0,0.18,0.45);
+  return (PARTS = { bodyGeo, faceGeo, atlas: g.canvas, extras, jobGeo, badgeGeo, eyeGeo, specsGeo, furGeo });
 }
 
 // ---- the flat painter (the fallback where WebGL will not start) ----------------------------------------------------------------
@@ -160,23 +185,10 @@ export function drawBlob(g, { id, mood, blink = false, color, dark, cx, base, un
   drawFace(g, mood, B.look, blink);
   g.restore();
 
-  // hats and the like, in the body's own space as the 3D ones are
-  if (B.extra === 0) {                                      // a sprout
-    g.strokeStyle = g.fillStyle = "#5fae3b"; g.lineWidth = Math.max(1.5, unit * 0.035); g.lineCap = "round";
-    g.beginPath(); g.moveTo(0, -1.19 * H); g.lineTo(0, -1.35 * H); g.stroke();
-    [-1, 1].forEach(sd => { g.save(); g.translate(sd * 0.09 * W, -1.37 * H); g.rotate(-sd * 0.5);
-      g.beginPath(); g.ellipse(0, 0, 0.1 * W, 0.03 * H + 1.5, 0, 0, Math.PI * 2); g.fill(); g.restore(); });
-  } else if (B.extra === 1) {                               // a straw hat
-    g.fillStyle = "#e2c275";
-    g.beginPath(); g.ellipse(0, -1.13 * H, 0.45 * W, 0.045 * H, 0, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.moveTo(-0.29 * W, -1.13 * H); g.lineTo(-0.23 * W, -1.27 * H); g.lineTo(0.23 * W, -1.27 * H); g.lineTo(0.29 * W, -1.13 * H); g.closePath(); g.fill();
-    g.fillStyle = "#b9974f"; g.fillRect(-0.195 * W, -1.15 * H, 0.39 * W, 0.03 * H);
-  } else if (B.extra === 2) {                               // a bow
-    g.fillStyle = "#d8434f";
-    [-1, 1].forEach(sd => { g.beginPath(); g.moveTo(0, -1.23 * H); g.lineTo(sd * 0.15 * W, -1.3 * H); g.lineTo(sd * 0.15 * W, -1.16 * H); g.closePath(); g.fill(); });
-    g.beginPath(); g.arc(0, -1.23 * H, 0.04 * W + 1, 0, Math.PI * 2); g.fill();
-  }
-  if(B.extra===3) {g.strokeStyle='#3b6575';g.lineWidth=unit*0.055;g.beginPath();g.ellipse(0,-1.04*H,0.385*W,0.07*H,0,0,Math.PI*2);g.stroke();}
+  if(B.extra===1){g.fillStyle='#2855b9';g.beginPath();g.ellipse(0,-1.07*H,.43*W,.22*H,0,Math.PI,Math.PI*2);g.fill();g.fillRect(-.2*W,-1.08*H,.78*W,.05*H);}
+  if(B.extra===2){g.fillStyle='#e73588';for(const side of [-1,1]){g.beginPath();g.ellipse(side*.17*W,-1.15*H,.22*W,.13*H,-side*.45,0,Math.PI*2);g.fill();}}
+  if(B.extra===3){g.fillStyle='#232126';g.beginPath();g.ellipse(-.09*W,-1.07*H,.53*W,.14*H,-.15,0,Math.PI*2);g.fill();}
+  if(B.extra===4){g.fillStyle='#fff5de';for(let i=0;i<5;i++){const a=i/5*Math.PI*2;g.beginPath();g.ellipse((-.27+Math.cos(a)*.12)*W,-(1.04+Math.sin(a)*.12)*H,.10*W,.075*H,a,0,Math.PI*2);g.fill();}}
   g.fillStyle='#fffaf0';g.beginPath();g.arc(0,-0.23*H,0.15*W,0,Math.PI*2);g.fill();
   g.fillStyle=color;g.beginPath();g.arc(0,-0.23*H,0.11*W,0,Math.PI*2);g.fill();
   g.restore();

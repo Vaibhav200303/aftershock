@@ -4,6 +4,7 @@
 // 2D canvas is painted from it with drawImage, which stays on the GPU. The canvases are
 // ordinary elements in the page, so they scroll and animate with it exactly.
 import * as THREE from 'three';
+import {plushMaterial} from './plushMaterial.js';
 import { FACE_COLS, FACE_LOOKS, bodyOf, blobParts } from './blob.js';
 
 let rig = null, failed = false;
@@ -26,7 +27,7 @@ function build(w, h, dpr) {
 
   const parts = blobParts();
   const who = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38, metalness: 0 });
+  const bodyMat = plushMaterial();
   who.add(new THREE.Mesh(parts.bodyGeo, bodyMat));
   const atlas = new THREE.CanvasTexture(parts.atlas);
   atlas.colorSpace = THREE.SRGBColorSpace;
@@ -41,8 +42,12 @@ function build(w, h, dpr) {
   const jobMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.5});
   who.add(new THREE.Mesh(parts.badgeGeo,new THREE.MeshStandardMaterial({color:0xfffaf0,roughness:0.6})));
   who.add(new THREE.Mesh(parts.jobGeo,jobMat));
+  const eyes=new THREE.Mesh(parts.eyeGeo,new THREE.MeshStandardMaterial({color:0x101014,roughness:.38}));eyes.position.y=.76;who.add(eyes);
+  const furMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,transparent:true,opacity:.5,side:THREE.DoubleSide,depthWrite:false});
+  who.add(new THREE.Mesh(parts.furGeo,furMat));
+  const specs=new THREE.Mesh(parts.specsGeo,new THREE.MeshStandardMaterial({color:0x18171b,roughness:.65}));who.add(specs);
   scene.add(who);
-  return { renderer, scene, camera, who, bodyMat, jobMat, atlas, hats, w, h, dpr, color: new THREE.Color() };
+  return { renderer, scene, camera, who, bodyMat, jobMat, eyes, furMat, specs, atlas, hats, w, h, dpr, color: new THREE.Color() };
 }
 
 // Paint villager `id` into a 2D context of w × h CSS pixels. `yaw` turns them (0 faces the
@@ -55,9 +60,10 @@ export function paintBlob(ctx, { id, mood, blink, color, yaw = 0, breath = 0, w,
   const B = bodyOf(id), R = rig;
   R.who.scale.set(B.girth * (1 + breath * 0.6), B.tall * (1 - breath), B.girth * (1 + breath * 0.6));
   R.who.rotation.set(B.leanX, yaw, B.leanZ);
-  R.bodyMat.color.set(B.color);
+  R.bodyMat.color.set(B.color);R.furMat.color.set(B.color);R.specs.visible=B.look===2;
   R.jobMat.color.copy(R.color.set(color));
   R.atlas.offset.set((mood * 2 + (blink ? 1 : 0)) / FACE_COLS, (FACE_LOOKS - 1 - B.look) / FACE_LOOKS);
+  R.eyes.scale.y=blink?.07:1;
   R.hats.forEach((m, k) => { m.visible = k === B.extra; });
   R.renderer.render(R.scene, R.camera);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
