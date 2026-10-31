@@ -440,7 +440,7 @@ export default class IslandApp extends React.Component {
 
   apply(snapshot, error) {
     if (error || !snapshot) { this.setState({ live: false, error: error || "no state yet" }); return; }
-    if (!snapshot.running) { this.lastAct = {}; this.live.clear(); this.ticker.length = 0; this.wire.length = 0; this.lastRound = null; }
+    if (!snapshot.running && !snapshot.completed) { this.lastAct = {}; this.live.clear(); this.ticker.length = 0; this.wire.length = 0; this.lastRound = null; }
     // What the bank minted and burned between this snapshot and the one before it — once a
     // poll, whatever else rebuilds the view in between.
     const books = snapshot.bank?.books || {};
@@ -452,13 +452,14 @@ export default class IslandApp extends React.Component {
     this.snapshot = snapshot;
     const sim = this.toSim(snapshot);
     this.setState({
-      sim, running: !!snapshot.running, paused: !!snapshot.paused, pausing: !!snapshot.pausing,
+      sim, completed: !!snapshot.completed, endReason: snapshot.endReason, running: !!snapshot.running, paused: !!snapshot.paused, pausing: !!snapshot.pausing,
       live: true, error: "", tickN: this.state.tickN + 1
     });
   }
 
   async request(endpoint) {
     if (this.state.busy) return;
+    if (endpoint === "/start" && this.state.completed && !confirm("Start a new village? This replaces the displayed results. The previous run remains saved.")) return;
     this.setState({ busy: true, error: "" });
     let requestError = "";
     try {
@@ -493,8 +494,8 @@ export default class IslandApp extends React.Component {
       const change = s.prices[k] - (s.pricePrev[k] ?? s.prices[k]);
       const tone = change > 0 ? 1 : change < 0 ? -1 : 0;
       return {
-        name: k, price: this.state.running ? fmt(s.prices[k], 2) : "-",
-        delta: !this.state.running ? "" : tone ? (tone > 0 ? "▲ +" : "▼ −") + fmt(Math.abs(change), 2) : "• 0.00",
+        name: k, price: (this.state.running || this.state.completed) ? fmt(s.prices[k], 2) : "-",
+        delta: !(this.state.running || this.state.completed) ? "" : tone ? (tone > 0 ? "▲ +" : "▼ −") + fmt(Math.abs(change), 2) : "• 0.00",
         deltaStyle: tapeStyle(tone), note: "vol " + s.vols[k], noteStyle: noteStyle("vol")
       };
     });
@@ -503,14 +504,14 @@ export default class IslandApp extends React.Component {
     const gdpPct = fmt(Math.abs(s.gdp - s.gdpPrev) / Math.max(1, s.gdpPrev) * 100, 1) + "%";
     // The village's GDP leads the row, in the title's gold: it is the headline number.
     tape.unshift(
-      { name: "village GDP", price: this.state.running ? fmt(s.gdp, 0) : "-", priceColor: "#8b631c",
-        delta: !this.state.running ? "" : (gdpTone > 0 ? "▲ +" : gdpTone < 0 ? "▼ −" : "• ") + gdpPct,
+      { name: "village GDP", price: (this.state.running || this.state.completed) ? fmt(s.gdp, 0) : "-", priceColor: "#8b631c",
+        delta: !(this.state.running || this.state.completed) ? "" : (gdpTone > 0 ? "▲ +" : gdpTone < 0 ? "▼ −" : "• ") + gdpPct,
         deltaStyle: tapeStyle(gdpTone), note: "round " + s.round, noteStyle: noteStyle("round") });
     const wbChange = s.wbRound - s.wbRoundPrev;
     const wbTone = Math.abs(wbChange) < 0.005 ? 0 : wbChange > 0 ? 1 : -1;
     tape.push(
-      { name: "wellbeing growth", price: !this.state.running ? "-" : (s.wbRound >= 0 ? "+" : "−") + fmt(Math.abs(s.wbRound), 2),
-        delta: !this.state.running ? "" : wbTone ? (wbTone > 0 ? "▲ +" : "▼ −") + fmt(Math.abs(wbChange), 2) : "• 0.00",
+      { name: "wellbeing growth", price: !(this.state.running || this.state.completed) ? "-" : (s.wbRound >= 0 ? "+" : "−") + fmt(Math.abs(s.wbRound), 2),
+        delta: !(this.state.running || this.state.completed) ? "" : wbTone ? (wbTone > 0 ? "▲ +" : "▼ −") + fmt(Math.abs(wbChange), 2) : "• 0.00",
         deltaStyle: tapeStyle(wbTone), note: "", noteStyle: noteStyle("") }
     );
 
@@ -539,7 +540,7 @@ export default class IslandApp extends React.Component {
       "GDP prints " + fmt(s.gdp, 0) + ", " + (s.gdp >= s.gdpPrev ? "up" : "down") + " " + fmt(Math.abs(s.gdp - s.gdpPrev) / Math.max(1, s.gdpPrev) * 100, 1) + "% on the round",
       dearest.charAt(0).toUpperCase() + dearest.slice(1) + " is the priciest good on the island right now",
       s.txTotal + " transactions written to Solana since the sun came up"
-    ] : ["The village is ready. Press Start to initialize the on-chain economy", this.state.error || "Waiting for the first settlers"];
+    ] : this.state.completed ? [(this.state.endReason === "limit" ? "Run completed" : "Run ended") + " · Round " + s.round + " · Final results", "Explore your villagers and dashboard, or start a new village"] : ["The village is ready. Press Start to initialize the on-chain economy", this.state.error || "Waiting for the first settlers"];
     // The villagers who have just spoken lead the wire; the round's own headlines follow.
     if (this.state.running && s.live?.length) headlines.unshift(...s.live);
     const busyLabel = this.state.running ? "Stopping…" : "Starting…";
@@ -560,7 +561,7 @@ export default class IslandApp extends React.Component {
         ? window.confirm("Stop this simulation and save the current run?") && this.request("/stop")
         : this.request("/start"),
       togglePause: () => this.state.running && this.request(this.state.paused || this.state.pausing ? "/resume" : "/pause"),
-      runLabel: this.state.busy ? busyLabel : this.state.running ? "Stop" : "Start",
+      runLabel: this.state.busy ? busyLabel : this.state.running ? "Stop" : this.state.completed ? "New village" : "Start",
       pauseLabel: this.state.pausing ? "Cancel pause" : this.state.paused ? "Resume" : "Pause",
       runBtnStyle: { all: "unset", cursor: this.state.busy ? "wait" : "pointer", opacity: this.state.busy ? .65 : 1, fontFamily: "Nunito, system-ui, sans-serif", fontSize: "15px", fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: this.state.running ? "#ff9d7a" : "#4ff0b0", textShadow: "0 2px 6px rgba(0,0,0,.85)" },
       pauseBtnStyle: { all: "unset", cursor: this.state.running && !this.state.busy ? "pointer" : "not-allowed", opacity: this.state.running && !this.state.busy ? 1 : .4, fontFamily: "Nunito, system-ui, sans-serif", fontSize: "15px", fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: "#263f38", textShadow: "0 2px 6px rgba(0,0,0,.85)" },

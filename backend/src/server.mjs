@@ -99,6 +99,7 @@ if (MANAGED) {                       // what the container can give a validator,
 }
 
 // ---- one simulation at a time --------------------------------------------------
+let finished = null;    // Public final snapshot and agent logs; no keys or live brain.
 let sim = null;          // { W, chain, brain, clock, gen, startedAt, log }
 let gen = 0;
 const sseClients = new Set();
@@ -235,7 +236,8 @@ async function begin({ provider: choice, model, agents, apiKey } = {}) {
     dials: BIRTH_DIALS,             // DIALS=… : what was moved off the defaults before the village was born
     agents: W.agents.map(a => ({ id: a.id, name: a.name, skills: a.skills, traits: a.traits })),
   }, null, 2));
-  sim = { W, chain, brain, gen: myGen, startedAt: Date.now(), dir, sigs: new Map(), agentLog: new Map(),
+  finished = null;
+  sim = { W, chain, brain, controllers: new Set(), gen: myGen, startedAt: Date.now(), dir, sigs: new Map(), agentLog: new Map(),
           paused: false, pausing: false, resumeClock: null,
           log: fs.createWriteStream(path.join(dir, 'events.jsonl')) };
   console.log(`logging to ${path.relative(ROOT, dir)}/`);
@@ -253,6 +255,7 @@ async function begin({ provider: choice, model, agents, apiKey } = {}) {
   async function decideOne(a, quorum) {
     const t0 = Date.now(), tools = makeTools(W, a), ac = new AbortController();
     tools.signal = ac.signal;
+    const owner = sim; owner.controllers.add(ac);
     W.beginDecision(a);
     // what each job was worth to this villager as its turn began: the numbers behind the
     // "what one shift of yours is worth" lines in `saw`, so nobody has to parse them back out
@@ -264,6 +267,7 @@ async function begin({ provider: choice, model, agents, apiKey } = {}) {
       quorum.reached.then(() => 'straggler'),
     ]);
     clearTimeout(timer);
+    owner.controllers.delete(ac);
     tools.close();
     const straggler = outcome === 'straggler';
     if (outcome === 'timeout' || straggler) ac.abort();
@@ -373,30 +377,41 @@ function resume() {
   return 'resumed';
 }
 
-async function stop() {
+async function stop(reason = 'stopped') {
   if (!sim) return 'not running';
-  const s = sim;
+  if (!sim.stopPromise) sim.stopPromise = finishStop(sim, reason);
+  return sim.stopPromise;
+}
+async function finishStop(s, reason) {
   s.stopping = true;
+  for (const controller of s.controllers) controller.abort();
   s.resumeClock?.();               // a paused clock must wake up so it can observe stopping
   await s.clock;                  // the round in progress finishes; a decision phase in progress is dropped
-  sim = null;
+  finished = { snapshot: structuredClone({ ...state(), running: false, completed: true, paused: false, pausing: false, endReason: reason, endedAt: new Date().toISOString() }),
+    agents: new Map(s.W.agents.map(a => [a.id, structuredClone({ id: a.id, name: a.name, model: a.model ?? null, traits: a.traits, decisions: s.agentLog.get(a.id) ?? [], journal: a.journal })])) };
+  try {
   const L = await s.chain.fetch();
   fs.writeFileSync(path.join(s.dir, 'final.json'), JSON.stringify({
+    snapshot: finished.snapshot,
     stoppedAt: new Date().toISOString(), rounds: s.W.round, transactions: s.chain.txCount(),
     policy: s.W.policyLog,          // every dial pulled, and the round it landed on
     llm: s.brain.stats(), chain: L,
     mint: s.chain.mint.toBase58(), settlersSupply: await s.chain.settlersSupply(),
   }, null, 2));
-  s.log.end();
   console.log(`saved ${path.relative(ROOT, s.dir)}/`);
   console.log(`stopped after ${s.W.round} rounds, ${s.chain.txCount()} transactions`);
+  } finally {
+  s.log.end();
   clearRuntimeKeys();                 // a visitor's key lives exactly as long as their run
   if (MANAGED) { s.chain.close(); stopValidator(); }
+  sim = null;
+  }
   return 'stopped';
 }
 
 // ---- snapshot for the dashboard ------------------------------------------------
 function state() {
+  if (!sim && finished) return { ...finished.snapshot, starting, providers: offered() };
   if (!sim) return { running: false, providers: offered(), maxAgents: MAX_AGENTS, hosted: HOSTED, starting, maxRounds: MAX_ROUNDS, keys: Object.fromEntries(providerNames().filter(n => n !== 'stub').map(n => [n, hasEnvKey(n)])),
                      config: { agents: CFG.AGENTS, maxAgents: MAX_AGENTS, provider: CFG.PROVIDER, model: modelFor(CFG.PROVIDER), decideTimeoutMs: CFG.DECIDE_TIMEOUT_MS, decideQuorum: CFG.DECIDE_QUORUM }, policy: [] };
   const { W, chain, brain } = sim;
@@ -563,6 +578,7 @@ const server = http.createServer(async (req, res) => {
     // one villager's whole run: every decision it made and every line it was told, oldest first
     if (pathname === '/agent' && req.method === 'GET') {
       const id = +new URL(req.url, 'http://localhost').searchParams.get('id');
+      if (!sim && finished?.agents.has(id)) return json(res, finished.agents.get(id));
       const a = sim?.W.agents.find(x => x.id === id);
       if (!a) return json(res, { error: 'no such agent' }, 404);
       return json(res, { id: a.id, name: a.name, model: a.model ?? null, traits: a.traits,
@@ -621,7 +637,7 @@ function listen(port = CFG.PORT) {
 }
 listen();
 // the hosted cap: a run that reaches MAX_ROUNDS stops itself
-if (MAX_ROUNDS) setInterval(() => { if (sim && !sim.stopping && sim.W.round >= MAX_ROUNDS) stop().catch(e => console.error(`auto-stop: ${e.message}`)); }, 1000).unref();
+if (MAX_ROUNDS) setInterval(() => { if (sim && !sim.stopping && sim.W.round >= MAX_ROUNDS) stop('limit').catch(e => console.error(`auto-stop: ${e.message}`)); }, 1000).unref();
 
 // ---- headless mode: RUN_SECONDS=45 or RUN_ROUNDS=100 starts immediately, prints a summary, exits ---
 // A round cap is what makes two runs comparable: by the clock, a slower model plays fewer rounds.

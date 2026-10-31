@@ -71,7 +71,7 @@ export function mountSwarm(host, { onPick } = {}) {
 
   // ---- data in --------------------------------------------------------------------
   function onState(s) {
-    running = !!s?.running;
+    running = !!(s?.running || s?.completed);
     emptyEl.style.display = running ? 'none' : '';
     if (!running) { nodes.clear(); links.clear(); coins.length = 0; byName.clear(); payments = 0; trades = 0; lastRoundSeen = 0; return; }
     ensureBank();

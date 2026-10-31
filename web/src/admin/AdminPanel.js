@@ -83,7 +83,7 @@ function setRange(next) {
   range = next;
   try { localStorage.setItem('admin.range', next); } catch { /* private window */ }
   root.querySelectorAll('#range button').forEach(b => b.classList.toggle('on', b.dataset.r === next));
-  if (last?.running && visible) { econ(); details(); }
+  if ((last?.running || last?.completed) && visible) { econ(); details(); }
 }
 const detailsOpen = () => activeTab !== 'overview';
 // a Solana explorer link for a transaction, on the same cluster as the ledger link the server gives
@@ -101,7 +101,7 @@ function selectTab(name, focus = false) {
   });
   root.querySelectorAll('[data-panel]').forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
   swarm?.setActive(visible && name === 'villagers' && $('swarmbox').open);
-  if (last?.running && visible) { econ(); details(); }
+  if ((last?.running || last?.completed) && visible) { econ(); details(); }
 }
 
 const MARKUP = `
@@ -807,6 +807,7 @@ async function togglePause() {
   refreshState();
 }
 async function toggle() {
+  if (last?.completed && !confirm('Start a new village? This replaces the displayed results. The previous run remains saved.')) return;
   btn.disabled = true;
   statusEl.textContent = running ? 'stopping' : 'starting, creating the ledger on Solana';
   const n = Math.round(+$('agents').value);
@@ -842,13 +843,13 @@ function render(s, error) {
   last = s;
   running = s.running;
   if (!visible) return;                 // the island is up; we redraw when we come back
-  btn.textContent = running ? 'Stop' : 'Start';
+  btn.textContent = running ? 'Stop' : s.completed ? 'New village' : 'Start';
   // Pause lets the round in hand finish first, so there is a moment of "pausing" in between;
   // pressing again in that moment calls the pause off.
   const pb = $('pausebtn');
   pb.disabled = !running;
   pb.textContent = s.pausing ? 'Cancel pause' : s.paused ? 'Resume' : 'Pause';
-  $('dashboard-empty').hidden = running;
+  $('dashboard-empty').hidden = running || s.completed;
   const cfg = s.config ?? {};
   // The village size is chosen here before a start, and fixed while it runs.
   const agentsEl = $('agents');
@@ -858,7 +859,7 @@ function render(s, error) {
   providerPicker(s);
   const tuning = cfg.decideTimeoutMs
     ? ` · <span class="muted">timeout ${(cfg.decideTimeoutMs / 1000).toFixed(1)}s</span>` : '';
-  if (!running) {
+  if (!running && !s.completed) {
     // the provider is named by the picker beside this line, so it is not repeated here — but
     // a backend that offered none to pick from leaves the picker hidden, and then it is.
     // cfg.model is .env's provider's model: picking another runs that one's own default.
@@ -870,7 +871,7 @@ function render(s, error) {
     return;
   }
   $('dash').style.display = '';
-  statusEl.innerHTML = `<b>round ${s.round}</b> · ${s.seconds}s · ${s.provider} · ${s.agents.length} agents`;
+  statusEl.innerHTML = `<b>${s.completed ? (s.endReason === 'limit' ? 'Run completed · ' : 'Run ended · ') : ''}round ${s.round}</b> · ${s.seconds}s · ${s.provider} · ${s.agents.length} agents`;
   modelFeed(s.llm);
   $('headline').innerHTML =
     `round ${(s.roundMs / 1000).toFixed(1)}s` +
@@ -894,7 +895,7 @@ export function mountAdmin(el) {
   btn = $('btn'); statusEl = $('status'); world = $('world'); events = $('events'); rows = $('rows');
   $('tiles').innerHTML = TILES.map(t => `<button type="button" class="tile" id="t-${t.id}" aria-expanded="false" aria-controls="tile-open" title="Open ${t.label} chart"></button>`).join('');
   TILES.forEach(t => { $('t-' + t.id).onclick = () => { openTile = openTile === t.id ? null : t.id; tiles(); }; });
-  $('more').addEventListener('toggle', () => { if (last?.running && visible) { details(); econ(); } });
+  $('more').addEventListener('toggle', () => { if ((last?.running || last?.completed) && visible) { details(); econ(); } });
   $('dialsbtn').setAttribute('aria-expanded', 'false');
   $('dialsbtn').setAttribute('aria-controls', 'admin-panel');
   root.addEventListener('keydown', event => {

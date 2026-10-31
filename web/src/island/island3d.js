@@ -865,7 +865,8 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
     /** /state: the truth, for first load, reconnection and drift — never a starting gun. */
     apply(s) {
       if (!s) return;                                    // server down: keep the last picture
-      if (!s.running) { this.blobs.clear(); this.round = null; this.syncBlobs(); return; }
+      this.completed = !!s.completed;
+      if (!s.running && !s.completed) { this.blobs.clear(); this.round = null; this.syncBlobs(); return; }
       setPopulation(s.agents?.length);
       queueHalf = Math.min(24, Math.max(8, (s.agents?.length || 0) * 0.5));
       const n = this.blobs.size;
@@ -1133,7 +1134,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       this.camera.updateMatrixWorld(true);
 
       const now = performance.now();
-      this.walk(Math.min(0.1, (now - (this._last || now)) / 1000), now);
+      this.walk(this.completed ? 0 : Math.min(0.1, (now - (this._last || now)) / 1000), now);
       this._last = now;
 
       // Area labels follow their spot on the island. The work is split in two by cost.

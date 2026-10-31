@@ -65,7 +65,7 @@ export function mountKeyGate(host) {
     if (!s) return;
     last = s;
     // only where the server has no key of its own, and only between runs
-    const want = !s.running && !dismissed && !Object.values(s.keys ?? { none: true }).some(Boolean);
+    const want = !s.running && !s.completed && !dismissed && !Object.values(s.keys ?? { none: true }).some(Boolean);
     if (s.running) dismissed = false;          // when this run ends, the door is shown again
     if (want && !shown) { shown = true; el.hidden = false; draw(); }
     else if (!want && shown && !busy) { shown = false; el.hidden = true; }
