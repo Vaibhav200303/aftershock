@@ -4,7 +4,7 @@
 //     auction, so there is no literal counterparty; the round's sellers and buyers of a good
 //     are matched by quantity, largest first, which is one exact way of splitting what was
 //     actually sold among who actually bought it. What the bank sold goes to the bank's node.
-//   - gold coins in flight are SETTLERS moving between purses on chain (the `moves` the
+//   - gold coins in flight are SALT moving between purses on chain (the `moves` the
 //     backend reads back off each settle_cash transaction; most settle through the vault).
 //   - a dashed tie to the bank is an open loan; a node's size is that villager's net worth,
 //     and its colour is the job they are doing right now.

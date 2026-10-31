@@ -1,11 +1,11 @@
-// Does the SETTLERS mint really track the village's money?
+// Does the SALT mint really track the village's money?
 //
 // Walks a tiny village through every instruction that can create or destroy a coin —
 // opening purses, a loan, a repayment, a foreclosure, a fire sale, a dividend — and
 // after each one checks the SPL mint's own supply against the ledger's books.
 //
 // Runs against its own validator, never the one the dashboard uses:
-//   backend/scripts/check-settlers.sh
+//   backend/scripts/check-salt.sh
 import {
   Connection, PublicKey, Transaction, TransactionInstruction, sendAndConfirmTransaction,
 } from '@solana/web3.js';
@@ -43,7 +43,7 @@ const C = await connectChain();
 
 // The one thing every step must leave true.
 async function invariant(after) {
-  const [L, spl] = [await C.fetch(), await C.settlersSupply()];
+  const [L, spl] = [await C.fetch(), await C.saltSupply()];
   const books = L.books.startMoney + L.books.bankSeed + L.books.minted
               - L.books.principalRepaid - L.books.writtenOff;
   ok(`supply matches after ${after}`, spl === L.supply + L.bank.cash && spl === books,
@@ -51,7 +51,7 @@ async function invariant(after) {
   return L;
 }
 
-console.log('\nSETTLERS\n');
+console.log('\nSALT\n');
 
 // ---- 1. the mint itself ------------------------------------------------------------
 await C.initialize(AGENTS, START_CASH, START_FOOD, START_WOOD, PRICES, BANK_SEED, TERMS);
@@ -65,29 +65,29 @@ ok('freeze authority is the mint PDA itself',
 const vaultAcct = await C.conn.getAccountInfo(C.vault, 'confirmed');
 ok('vault holds this mint', new PublicKey(vaultAcct.data.subarray(0, 32)).equals(C.mint));
 ok('vault is owned by the mint PDA', new PublicKey(vaultAcct.data.subarray(32, 64)).equals(C.mint));
-eq('opening supply', await C.settlersSupply(), AGENTS * START_CASH + BANK_SEED);
+eq('opening supply', await C.saltSupply(), AGENTS * START_CASH + BANK_SEED);
 eq('every coin is in the vault', Number(vaultAcct.data.readBigUInt64LE(64)), AGENTS * START_CASH + BANK_SEED);
 
 // ---- 2. settle moves goods, never money --------------------------------------------
-let before = await C.settlersSupply();
+let before = await C.saltSupply();
 await C.settle([
   { agent: 0, good: WOOD, delta: 30 },
   { agent: 1, good: FOOD, delta: 20 },
   { agent: 2, good: WOOD, delta: 10 },
 ]);
-eq('settle mints nothing', await C.settlersSupply(), before);
+eq('settle mints nothing', await C.saltSupply(), before);
 
 // ---- 3. lending is the only way a coin is born -------------------------------------
 const pledge = (good, qty) => { const c = Array(N_GOODS).fill(0); c[good] = qty; return c; };
 await C.borrow(0, 3000, TERM_UNIT_SLOTS * 3, pledge(WOOD, 24));
-eq('borrowing mints exactly what it lends', await C.settlersSupply(), before + 3000);
+eq('borrowing mints exactly what it lends', await C.saltSupply(), before + 3000);
 await invariant('borrow');
 
 await C.repay(0, 1000);
 let L = await invariant('repay');
 ok('repaying burns principal, not interest',
    L.books.principalRepaid > 0 && L.books.interestIncome > 0
-   && await C.settlersSupply() === before + 3000 - L.books.principalRepaid,
+   && await C.saltSupply() === before + 3000 - L.books.principalRepaid,
    `principal burned ${L.books.principalRepaid}, interest kept ${L.books.interestIncome}`);
 
 // a second loan, short term, by an agent who will be able to pay it
@@ -96,9 +96,9 @@ await invariant('second borrow');
 
 // ---- 4. an ordinary auction moves coins between purses, and mints none --------------
 // agent 0 spends nearly everything on agent 1's food, so its loan cannot be collected.
-before = await C.settlersSupply();
+before = await C.saltSupply();
 await C.clear(FOOD, [{ agent: 0, qty: 12, limit: 450 }], [{ agent: 1, qty: 12, limit: 350 }]);
-eq('an ordinary auction mints and burns nothing', await C.settlersSupply(), before);
+eq('an ordinary auction mints and burns nothing', await C.saltSupply(), before);
 L = await invariant('auction');
 ok('the borrower is now short of cash', L.slots[0].cash < L.slots[0].debt,
    `cash ${L.slots[0].cash}, debt ${L.slots[0].debt}`);
@@ -106,12 +106,12 @@ ok('the borrower is now short of cash', L.slots[0].cash < L.slots[0].debt,
 // ---- 5. an overdue loan whose debtor can pay: collected, not foreclosed -------------
 L = await C.fetch();
 while ((await C.slot()) <= L.slots[2].dueSlot) await sleep(400);
-const beforeCollect = await C.settlersSupply();
+const beforeCollect = await C.saltSupply();
 await C.collect(2);
 L = await invariant('collection');
 ok('the collected loan closed and released its collateral',
    L.slots[2].debt === 0 && L.slots[2].locked[WOOD] === 0);
-ok('collecting burned the principal', await C.settlersSupply() < beforeCollect);
+ok('collecting burned the principal', await C.saltSupply() < beforeCollect);
 
 // ---- 6. a margin call, and a loss bigger than the bank can absorb -------------------
 // wood crashes, so the pledged wood no longer covers the loan.
@@ -152,18 +152,18 @@ try {
 } catch (e) { refused = [...(e.transactionLogs ?? e.logs ?? []), e.message].join('\n'); }
 ok('a bank sale without the mint accounts is refused', /MintAccountsRequired/.test(refused ?? ''));
 
-const beforeSale = await C.settlersSupply();
+const beforeSale = await C.saltSupply();
 const badDebtBefore = L.badDebt;
 await C.clear(WOOD, bids, asks);
 L = await invariant('fire sale');
 ok('the bank sold its seized wood', L.bank.goods[WOOD] < bankWood);
 eq('the sale burned exactly the bad debt it paid down',
-   beforeSale - await C.settlersSupply(), badDebtBefore - L.badDebt);
+   beforeSale - await C.saltSupply(), badDebtBefore - L.badDebt);
 
 // ---- 8. a dividend moves coins, never creates them ---------------------------------
-before = await C.settlersSupply();
+before = await C.saltSupply();
 await C.payDividend();
-eq('a dividend mints nothing', await C.settlersSupply(), before);
+eq('a dividend mints nothing', await C.saltSupply(), before);
 await invariant('dividend');
 
 console.log(`\n${failures ? 'FAILED' : 'passed'}: ${checks - failures}/${checks} checks`);

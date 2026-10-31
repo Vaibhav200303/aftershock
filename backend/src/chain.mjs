@@ -36,10 +36,10 @@ const MAX_DELTAS_PER_TX = 120;
 const MAX_PURSES_PER_TX = 20;
 const PURSE_UNITS = 1_000_000;        // compute budget for a purse transaction (see send)
 
-// The SPL Token program, and the SETTLERS mint's decimals. Cash is held in cents and the
+// The SPL Token program, and the SALT mint's decimals. Cash is held in cents and the
 // mint has 2 decimals, so one token base unit is one cent: no conversion, anywhere.
 export const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-export const SETTLERS_DECIMALS = 2;
+export const SALT_DECIMALS = 2;
 
 // On a public cluster the link must name it; a customUrl pointing at 127.0.0.1 resolves
 // to the reader's own machine, where nothing is listening.
@@ -60,9 +60,9 @@ export async function connectChain() {
   // call that `pay_dividend` really is open to anyone.
   const keeper = Keypair.generate();
   // The coin. Both are PDAs of this ledger, so neither has a private key: the mint is
-  // its own mint and freeze authority, and it owns the vault that holds every SETTLER.
+  // its own mint and freeze authority, and it owns the vault that holds every SALT.
   const [mint] = PublicKey.findProgramAddressSync(
-    [Buffer.from('settlers'), ledger.publicKey.toBuffer()], PROGRAM_ID);
+    [Buffer.from('salt'), ledger.publicKey.toBuffer()], PROGRAM_ID);
   const [vault] = PublicKey.findProgramAddressSync(
     [Buffer.from('vault'), ledger.publicKey.toBuffer()], PROGRAM_ID);
   // An agent's purse: an SPL token account at ["purse", ledger, agent] that owns itself,
@@ -219,7 +219,7 @@ export async function connectChain() {
     return Promise.all(groups.map(g => send(purseCall(DISC.init_purses, g, keys), [], undefined, PURSE_UNITS)));
   }
 
-  // Move real SETTLERS between the agents named, until every purse holds what the ledger
+  // Move real SALT between the agents named, until every purse holds what the ledger
   // says that agent has. The program derives the transfers; we only say who to look at.
   //
   // A chunk pays its own receivers out of its own payers and settles the remainder against
@@ -369,7 +369,7 @@ export async function connectChain() {
   // under margin (see collectable()). An overdue loan whose debtor has the cash is simply
   // repaid from it — no penalty, collateral released (see collects()); otherwise it's a
   // foreclosure with the penalty. Signed by the authority, like every other write. The
-  // debtor's purse rides along, as it does on a repay, so their SETTLERS move with the books.
+  // debtor's purse rides along, as it does on a repay, so their SALT move with the books.
   async function collect(agent) {
     const d = Buffer.alloc(8 + 2);
     DISC.collect.copy(d, 0);
@@ -433,7 +433,7 @@ export async function connectChain() {
   // What the SPL mint itself says exists, in cents. The program checks this against
   // `supply + bank.cash` after every instruction that can move either, so a mismatch
   // here means a transaction that should have failed did not.
-  async function settlersSupply() {
+  async function saltSupply() {
     const acct = await conn.getAccountInfo(mint, 'confirmed');
     return acct ? Number(acct.data.readBigUInt64LE(36)) : null;   // SPL mint layout: supply at 36
   }
@@ -447,7 +447,7 @@ export async function connectChain() {
     purseOf: agent => purseOf(agent).pubkey,
     MAX_PURSES_PER_TX,
     slot: () => conn.getSlot('confirmed'),
-    mint, vault, settlersSupply,
+    mint, vault, saltSupply,
     MAX_ORDERS_PER_TX, MAX_ORDERS_BANK_TX, LEDGER_SIZE, txCount: () => txCount,
   };
 }

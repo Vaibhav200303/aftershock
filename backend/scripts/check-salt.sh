@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify the SETTLERS mint against the village's books, on a validator of its own.
+# Verify the SALT mint against the village's books, on a validator of its own.
 # Never touches port 8899: the dashboard's validator keeps running.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -48,4 +48,4 @@ done
 solana airdrop 100 --url "$RPC" --keypair ~/.config/solana/id.json >/dev/null
 echo "program $PROGRAM_ID loaded"
 
-RPC="$RPC" AGENTS=3 node backend/scripts/check-settlers.mjs
+RPC="$RPC" AGENTS=3 node backend/scripts/check-salt.mjs

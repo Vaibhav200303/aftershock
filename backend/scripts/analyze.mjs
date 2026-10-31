@@ -280,10 +280,10 @@ if (rounds.at(-1)?.bank?.books) {
       'per agent: principal ≤ debt; no debt ⇒ no principal, nothing locked': r => r.bank.slotsOk,
     } : {}),
   };
-  // the SETTLERS mint against the books — only runs since the coin exists recorded it
-  if (rounds.at(-1).bank.settlers != null) {
-    checks['SETTLERS supply = Σ agent cash + bank cash'] =
-      r => r.bank.settlers == null || r.bank.settlers === r.bank.sumCash + r.bank.cash;
+  // the SALT mint against the books — only runs since the coin exists recorded it
+  if (rounds.at(-1).bank.salt != null) {
+    checks['SALT supply = Σ agent cash + bank cash'] =
+      r => r.bank.salt == null || r.bank.salt === r.bank.sumCash + r.bank.cash;
   }
   const bad = Object.fromEntries(Object.keys(checks).map(k => [k, []]));
   for (const r of rounds) for (const [k, f] of Object.entries(checks)) if (!f(r)) bad[k].push(r.round);
@@ -308,8 +308,8 @@ if (rounds.at(-1)?.bank?.books) {
       `debt ${ok(L.debtTotal === L.slots.reduce((s, x) => s + x.debt, 0))}` +
       (k.refunds !== undefined ? `   bank cash ${ok(L.bank.cash === k.bankSeed + k.interestIncome + k.penalties + k.recovered - k.refunds - k.writtenOff - k.dividendsPaid)}` +
         `   minted ${ok(k.minted === L.slots.reduce((s, x) => s + x.principal, 0) + k.principalRepaid + k.writtenOff + k.badDebt)}` : '') +
-      (final.settlersSupply != null ? `   SETTLERS ${ok(final.settlersSupply === cash + L.bank.cash)}` : ''));
-    if (final.mint) console.log(`SETTLERS ${final.mint}: ${coins(final.settlersSupply)} in existence`);
+      (final.saltSupply != null ? `   SALT ${ok(final.saltSupply === cash + L.bank.cash)}` : ''));
+    if (final.mint) console.log(`SALT ${final.mint}: ${coins(final.saltSupply)} in existence`);
   }
 }
 

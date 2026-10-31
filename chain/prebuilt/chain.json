@@ -55,13 +55,9 @@
                 "kind": "const",
                 "value": [
                   115,
-                  101,
-                  116,
-                  116,
+                  97,
                   108,
-                  101,
-                  114,
-                  115
+                  116
                 ]
               },
               {
@@ -164,13 +160,9 @@
                 "kind": "const",
                 "value": [
                   115,
-                  101,
-                  116,
-                  116,
+                  97,
                   108,
-                  101,
-                  114,
-                  115
+                  116
                 ]
               },
               {
@@ -299,13 +291,9 @@
                 "kind": "const",
                 "value": [
                   115,
-                  101,
-                  116,
-                  116,
+                  97,
                   108,
-                  101,
-                  114,
-                  115
+                  116
                 ]
               },
               {
@@ -391,13 +379,9 @@
                 "kind": "const",
                 "value": [
                   115,
-                  101,
-                  116,
-                  116,
+                  97,
                   108,
-                  101,
-                  114,
-                  115
+                  116
                 ]
               },
               {
@@ -466,13 +450,9 @@
                 "kind": "const",
                 "value": [
                   115,
-                  101,
-                  116,
-                  116,
+                  97,
                   108,
-                  101,
-                  114,
-                  115
+                  116
                 ]
               },
               {
@@ -622,13 +602,9 @@
                 "kind": "const",
                 "value": [
                   115,
-                  101,
-                  116,
-                  116,
+                  97,
                   108,
-                  101,
-                  114,
-                  115
+                  116
                 ]
               },
               {
@@ -713,7 +689,7 @@
     {
       "name": "settle_cash",
       "docs": [
-        "Move real SETTLERS between agents until every purse holds what the ledger says",
+        "Move real SALT between agents until every purse holds what the ledger says",
         "that agent has.",
         "",
         "`settle_money` reconciles the *total* — how many coins exist. This reconciles the",
@@ -756,13 +732,9 @@
                 "kind": "const",
                 "value": [
                   115,
-                  101,
-                  116,
-                  116,
+                  97,
                   108,
-                  101,
-                  114,
-                  115
+                  116
                 ]
               },
               {
@@ -1006,7 +978,7 @@
     {
       "code": 6019,
       "name": "SupplyMismatch",
-      "msg": "the SETTLERS supply no longer matches the village's books"
+      "msg": "the SALT supply no longer matches the village's books"
     },
     {
       "code": 6020,
@@ -1016,7 +988,7 @@
     {
       "code": 6021,
       "name": "BadMint",
-      "msg": "not this ledger's SETTLERS mint"
+      "msg": "not this ledger's SALT mint"
     },
     {
       "code": 6022,

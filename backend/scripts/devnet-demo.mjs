@@ -23,10 +23,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const step = async (what, fn) => {
   process.stdout.write(`  ${what.padEnd(42)}`);
   const r = await fn();
-  const supply = await C.settlersSupply();
+  const supply = await C.saltSupply();
   const L = await C.fetch();
   const okay = supply === L.supply + L.bank.cash;
-  console.log(`SETTLERS ${(supply / 100).toFixed(2).padStart(10)}  ${okay ? 'books agree' : 'MISMATCH'}`);
+  console.log(`SALT ${(supply / 100).toFixed(2).padStart(10)}  ${okay ? 'books agree' : 'MISMATCH'}`);
   if (!okay) throw new Error('the mint no longer matches the books');
   await sleep(1200);
   return r;
@@ -42,7 +42,7 @@ await step('opening the village', () =>
   C.initialize(AGENTS, START_CASH, START_FOOD, START_WOOD, CFG.START_PRICES, BANK_SEED, TERMS));
 
 console.log(`\nledger   ${C.ledger.publicKey.toBase58()}`);
-console.log(`SETTLERS ${C.mint.toBase58()}`);
+console.log(`SALT ${C.mint.toBase58()}`);
 console.log(`vault    ${C.vault.toBase58()}\n`);
 
 await step('a week of gathering', () => C.settle([
@@ -74,11 +74,11 @@ if (seized > 0) {
 await step('the surplus is paid out', () => C.payDividend());
 
 L = await C.fetch();
-const supply = await C.settlersSupply();
-console.log(`\n${AGENTS} villagers, ${(supply / 100).toFixed(2)} SETTLERS in existence`);
+const supply = await C.saltSupply();
+console.log(`\n${AGENTS} villagers, ${(supply / 100).toFixed(2)} SALT in existence`);
 console.log(`bad debt ${(L.badDebt / 100).toFixed(2)}, written off ${(L.books.writtenOff / 100).toFixed(2)}, minted by loans ${(L.books.minted / 100).toFixed(2)}\n`);
 console.log('look it up:');
-console.log(`  SETTLERS  ${explorer('address', C.mint.toBase58())}`);
+console.log(`  SALT  ${explorer('address', C.mint.toBase58())}`);
 console.log(`  vault     ${explorer('address', C.vault.toBase58())}`);
 console.log(`  ledger    ${explorer('address', C.ledger.publicKey.toBase58())}`);
 console.log(`  program   ${explorer('address', PROGRAM_ID.toBase58())}`);

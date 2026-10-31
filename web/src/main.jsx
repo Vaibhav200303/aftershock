@@ -83,7 +83,7 @@ function apply(next) {
   frame.hidden = false;
   setAdminVisible(next === 'admin');
   syncLowPower();
-  document.title = next === 'admin' ? 'agent-economy admin' : 'Settlers of Solana';
+  document.title = next === 'admin' ? 'saltmarsh admin' : 'Saltmarsh';
 }
 
 // The inset is a camera, not a game: a few frames a second is all it needs. The element may

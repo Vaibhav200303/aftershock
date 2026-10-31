@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify that agents hold and pay each other in real SETTLERS, on a validator of its own.
+# Verify that agents hold and pay each other in real SALT, on a validator of its own.
 # Never touches port 8899: the dashboard's validator keeps running.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 # The Solana tools are not always on a non-interactive PATH.
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
-# rpc_port + 1 is the websocket port, so 8997 keeps clear of check-settlers.sh on 8999.
+# rpc_port + 1 is the websocket port, so 8997 keeps clear of check-salt.sh on 8999.
 RPC_PORT=8997
 LEDGER_DIR=$(mktemp -d)
 RPC="http://127.0.0.1:${RPC_PORT}"

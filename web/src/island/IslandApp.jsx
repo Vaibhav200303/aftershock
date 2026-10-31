@@ -19,7 +19,7 @@ const coins = c => (Number(c) / 100).toFixed(2);
 
 // One line on the market wire for one villager, the moment they answer.
 function wireLine(act, seen) {
-  const who = act.name || `Settler ${act.id}`;
+  const who = act.name || `Villager ${act.id}`;
   const order = act.orders?.at(-1);
   if (order) return `${who} ${order.side === 'buy' ? 'bids' : 'offers'} ${order.qty} ${order.good} at ${coins(order.price ?? order.limit)}c` +
     (order.reason ? `: ${clip(order.reason, 70)}` : '');
@@ -346,7 +346,7 @@ export default class IslandApp extends React.Component {
 
   activityFor(a) {
     // Carrying orders is the normal state, not a sign of trading: counting on it put nearly
-    // every settler at the market. The shift the backend reports wins, and the last known
+    // every villager at the market. The shift the backend reports wins, and the last known
     // one carries through the deciding phase, as the 3D scene already does.
     this.lastAct = this.lastAct || {};
     if (a.activity === "smoke_fish" || LOCS.some(l => l.act === a.activity)) return (this.lastAct[a.id] = a.activity);
@@ -525,19 +525,19 @@ export default class IslandApp extends React.Component {
     const busiest = LOCS.reduce((a, l) => (counts[l.id] || 0) > (counts[a.id] || 0) ? l : a, LOCS[0]);
     const dearest = Object.keys(s.prices).reduce((a, k) => s.prices[k] > s.prices[a] ? k : a, "food");
     const headlines = this.state.running ? [
-      "Food clears at " + fmt(s.prices.food, 2) + "c with " + countFor("gather_food") + " settlers working the lake",
+      "Food clears at " + fmt(s.prices.food, 2) + "c with " + countFor("gather_food") + " villagers working the lake",
       "Wood settles at " + fmt(s.prices.wood, 2) + "c with " + s.vols.wood + " units traded",
       s.minted > 0 ? "Bank mints " + s.minted + "c of fresh credit; village debt now " + fmt(s.debt, 0) + "c"
         : "No new credit issued this round, so debt holds at " + fmt(s.debt, 0) + "c",
       s.burned > 0 ? "Repayments burn " + s.burned + "c out of circulation" : "Nothing repaid this round; supply steady at " + fmt(s.supply, 0) + "c",
       "Round " + s.round + " settled on-chain in " + s.lastRoundTxs + " transactions",
-      busiest.name + " is the busiest place on the island with " + (counts[busiest.id] || 0) + " settlers there",
+      busiest.name + " is the busiest place on the island with " + (counts[busiest.id] || 0) + " villagers there",
       "Nets hold at " + fmt(s.prices.nets, 2) + "c as crafters stock up on wood",
       "Houses asking " + fmt(s.prices.houses, 0) + "c with " + countFor("build_house") + " frames going up at the building site",
       "GDP prints " + fmt(s.gdp, 0) + ", " + (s.gdp >= s.gdpPrev ? "up" : "down") + " " + fmt(Math.abs(s.gdp - s.gdpPrev) / Math.max(1, s.gdpPrev) * 100, 1) + "% on the round",
       dearest.charAt(0).toUpperCase() + dearest.slice(1) + " is the priciest good on the island right now",
       s.txTotal + " transactions written to Solana since the sun came up"
-    ] : ["The village is ready. Press Start to initialize the on-chain economy", this.state.error || "Waiting for the first settlers"];
+    ] : ["The village is ready. Press Start to initialize the on-chain economy", this.state.error || "Waiting for the first villagers"];
     // The villagers who have just spoken lead the wire; the round's own headlines follow.
     if (this.state.running && s.live?.length) headlines.unshift(...s.live);
     const busyLabel = this.state.running ? "Stopping…" : "Starting…";
@@ -583,7 +583,7 @@ export default class IslandApp extends React.Component {
         <main style={S("grid-row: 1 / -1; grid-column: 1; position: relative; overflow: hidden; z-index: 0;")}>
           <div style={S("position: absolute; inset: 0; z-index: 0;")}>
             <island-3d hide-labels={this.state.uiHidden ? "" : undefined} style={S("position: absolute; inset: 0;")}></island-3d>
-            <div style={v.titleStyle}>Settlers of Solana</div>
+            <div style={v.titleStyle}>Saltmarsh</div>
             <div style={v.chainPanelStyle}>
               {/* The count is the link: clicking it opens the ledger in Solana Explorer. */}
               <a href={v.explorer} target="_blank" rel="noreferrer" title="Open in Solana Explorer"
