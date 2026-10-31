@@ -485,8 +485,8 @@ export default class IslandApp extends React.Component {
     const counts = {}; LOCS.forEach(l => counts[l.id] = 0);
     s.agents.forEach(a => counts[bucketOf(a.act).id] = (counts[bucketOf(a.act).id] || 0) + 1);
 
-    const tapeStyle = tone => ({ fontSize: "12px", fontWeight: 800, color: tone > 0 ? "#3fe0a0" : tone < 0 ? "#ff7d63" : "#8b9095", whiteSpace: "nowrap" });
-    const noteStyle = note => ({ display: note ? "inline" : "none", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", color: "#7d8287" });
+    const tapeStyle = tone => ({ fontSize: "12px", fontWeight: 800, color: tone > 0 ? "#267254" : tone < 0 ? "#b34e35" : "#61746c", whiteSpace: "nowrap" });
+    const noteStyle = note => ({ display: note ? "inline" : "none", fontFamily: "'IBM Plex Mono', monospace", fontSize: "11px", color: "#61746c" });
     const tape = Object.keys(s.prices).map(k => {
       const change = s.prices[k] - (s.pricePrev[k] ?? s.prices[k]);
       const tone = change > 0 ? 1 : change < 0 ? -1 : 0;
@@ -501,7 +501,7 @@ export default class IslandApp extends React.Component {
     const gdpPct = fmt(Math.abs(s.gdp - s.gdpPrev) / Math.max(1, s.gdpPrev) * 100, 1) + "%";
     // The village's GDP leads the row, in the title's gold: it is the headline number.
     tape.unshift(
-      { name: "village GDP", price: this.state.running ? fmt(s.gdp, 0) : "-", priceColor: "#ffcf4a",
+      { name: "village GDP", price: this.state.running ? fmt(s.gdp, 0) : "-", priceColor: "#8b631c",
         delta: !this.state.running ? "" : (gdpTone > 0 ? "▲ +" : gdpTone < 0 ? "▼ −" : "• ") + gdpPct,
         deltaStyle: tapeStyle(gdpTone), note: "round " + s.round, noteStyle: noteStyle("round") });
     const wbChange = s.wbRound - s.wbRoundPrev;
@@ -561,15 +561,15 @@ export default class IslandApp extends React.Component {
       runLabel: this.state.busy ? busyLabel : this.state.running ? "Stop" : "Start",
       pauseLabel: this.state.pausing ? "Cancel pause" : this.state.paused ? "Resume" : "Pause",
       runBtnStyle: { all: "unset", cursor: this.state.busy ? "wait" : "pointer", opacity: this.state.busy ? .65 : 1, fontFamily: "Nunito, system-ui, sans-serif", fontSize: "15px", fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: this.state.running ? "#ff9d7a" : "#4ff0b0", textShadow: "0 2px 6px rgba(0,0,0,.85)" },
-      pauseBtnStyle: { all: "unset", cursor: this.state.running && !this.state.busy ? "pointer" : "not-allowed", opacity: this.state.running && !this.state.busy ? 1 : .4, fontFamily: "Nunito, system-ui, sans-serif", fontSize: "15px", fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: "#f2f3f4", textShadow: "0 2px 6px rgba(0,0,0,.85)" },
+      pauseBtnStyle: { all: "unset", cursor: this.state.running && !this.state.busy ? "pointer" : "not-allowed", opacity: this.state.running && !this.state.busy ? 1 : .4, fontFamily: "Nunito, system-ui, sans-serif", fontSize: "15px", fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: "#263f38", textShadow: "0 2px 6px rgba(0,0,0,.85)" },
       toggleUi: () => this.setState({ uiHidden: !this.state.uiHidden }),
       hideUiLabel: this.state.uiHidden ? "Show UI" : "Hide UI",
-      hideUiBtnStyle: { all: "unset", gridRow: "2", gridColumn: "1", alignSelf: "end", justifySelf: "end", margin: "0 18px 6px", position: "relative", zIndex: 6, cursor: "pointer", fontFamily: "Nunito, system-ui, sans-serif", fontSize: "12.5px", fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: "#f2f3f4", textShadow: "0 2px 6px rgba(0,0,0,.85)" },
+      hideUiBtnStyle: { all: "unset", gridRow: "2", gridColumn: "1", alignSelf: "end", justifySelf: "end", margin: "0 18px 6px", position: "relative", zIndex: 6, cursor: "pointer", fontFamily: "Nunito, system-ui, sans-serif", fontSize: "12.5px", fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: "#263f38", textShadow: "0 2px 6px rgba(0,0,0,.85)" },
       // The island is the whole stage and the footer lies over its bottom edge on a scrim, so
       // Hide UI only has to fade the furniture out: the water is already underneath it, and
       // the island keeps exactly the frame it had.
-      chainPanelStyle: { display: "flex", opacity: this.state.uiHidden ? 0 : 1, pointerEvents: this.state.uiHidden ? "none" : "auto", transition: "opacity .35s ease", position: "absolute", right: "26px", top: "22px", width: "204px", flexDirection: "column", gap: "5px", background: "rgba(16,16,18,.55)", border: "1px solid rgba(255,255,255,.1)", borderRadius: "8px", padding: "10px 12px 6px", color: "#e6e8ea", zIndex: 5 },
-      titleStyle: { opacity: this.state.uiHidden ? 0 : 1, transition: "opacity .35s ease", position: "absolute", left: "28px", top: "22px", zIndex: 5, pointerEvents: "none", fontFamily: "Grandstander, 'Baloo 2', cursive", fontSize: "26px", fontWeight: 900, letterSpacing: ".2px", lineHeight: 1, color: "#ffcf4a", whiteSpace: "nowrap", textShadow: "0 3px 0 #6b4a2a, 0 4px 0 rgba(43,28,15,.45)" },
+      chainPanelStyle: { display: "flex", opacity: this.state.uiHidden ? 0 : 1, pointerEvents: this.state.uiHidden ? "none" : "auto", transition: "opacity .35s ease", position: "absolute", right: "26px", top: "22px", width: "204px", flexDirection: "column", gap: "5px", background: "rgba(16,16,18,.55)", border: "1px solid rgba(255,255,255,.1)", borderRadius: "8px", padding: "10px 12px 6px", color: "#263f38", zIndex: 5 },
+      titleStyle: { opacity: this.state.uiHidden ? 0 : 1, transition: "opacity .35s ease", position: "absolute", left: "28px", top: "22px", zIndex: 5, pointerEvents: "none", fontFamily: "Grandstander, 'Baloo 2', cursive", fontSize: "26px", fontWeight: 900, letterSpacing: ".2px", lineHeight: 1, color: "#8b631c", whiteSpace: "nowrap", textShadow: "0 3px 0 #6b4a2a, 0 4px 0 rgba(43,28,15,.45)" },
       footerStyle: { gridRow: "3", gridColumn: "1", position: "relative", zIndex: 6, background: "linear-gradient(180deg, rgba(10,10,12,0) 0%, rgba(10,10,12,.66) 38%, rgba(10,10,12,.86) 100%)", display: "flex", opacity: this.state.uiHidden ? 0 : 1, pointerEvents: this.state.uiHidden ? "none" : "auto", transition: "opacity .35s ease", flexDirection: "column", gap: "6px", padding: "22px 18px 10px", minWidth: 0 }
     };
   }
@@ -578,20 +578,20 @@ export default class IslandApp extends React.Component {
   render() {
     const v = this.renderVals();
     return (
-      <div style={S("font-family: Nunito, system-ui, sans-serif; position: relative; height: 100%; min-height: 420px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); overflow: hidden; background: #0c0d0f; color: #e6e8ea;")}>
+      <div style={S("font-family: Nunito, system-ui, sans-serif; position: relative; height: 100%; min-height: 420px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); overflow: hidden; background: #b9e4e6; color: #263f38;")}>
 
         <main style={S("grid-row: 1 / -1; grid-column: 1; position: relative; overflow: hidden; z-index: 0;")}>
           <div style={S("position: absolute; inset: 0; z-index: 0;")}>
             <island-3d hide-labels={this.state.uiHidden ? "" : undefined} style={S("position: absolute; inset: 0;")}></island-3d>
-            <div style={v.titleStyle}>Settlers of Solana</div>
-            <div style={v.chainPanelStyle}>
+
+            <div className="hud-chain" style={v.chainPanelStyle}>
               {/* The count is the link: clicking it opens the ledger in Solana Explorer. */}
               <a href={v.explorer} target="_blank" rel="noreferrer" title="Open in Solana Explorer"
                  style={S("display: flex; align-items: baseline; gap: 6px; text-decoration: none; cursor: pointer; white-space: nowrap;")}>
-                <CountUp value={v.txTotal} style={S("font-family: 'IBM Plex Mono', monospace; font-size: 15px; line-height: 1.1; color: #5fe3ae; font-variant-numeric: tabular-nums;")} />
-                <span style={S("font-size: 10px; font-weight: 700; color: #9a9fa4;")}>tx on Solana</span>
+                <CountUp value={v.txTotal} style={S("font-family: 'IBM Plex Mono', monospace; font-size: 15px; line-height: 1.1; color: #226f60; font-variant-numeric: tabular-nums;")} />
+                <span style={S("font-size: 10px; font-weight: 700; color: #526b65;")}>tx on Solana</span>
                 <span style={S("flex: 1")}></span>
-                <span style={S("font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: #7d8287;")}>{v.txRate}/min</span>
+                <span style={S("font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: #61746c;")}>{v.txRate}/min</span>
               </a>
               {/* Newest on top. A row that arrives opens up from nothing (feedpush), which
                   pushes the ones under it down; the window is a fixed height with a fade at
@@ -603,25 +603,25 @@ export default class IslandApp extends React.Component {
                   <a key={f.id} href={f.url || undefined} target="_blank" rel="noreferrer" className="island-feed-row"
                      style={S("flex: none; display: grid; grid-template-columns: 5px minmax(0, 1fr) auto; gap: 6px; align-items: center; min-width: 0; height: 16px; margin-bottom: 2px; overflow: hidden; animation: feedpush .32s cubic-bezier(.2,.7,.2,1) both; text-decoration: none;")}>
                     <span title={f.short} style={S(`width: 5px; height: 5px; border-radius: 50%; background: ${f.color}; opacity: .85;`)}></span>
-                    <span style={S("font-size: 10.5px; font-weight: 700; color: #d5d8db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;")}>{f.sig}</span>
-                    <span style={S("font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: #8e9398; white-space: nowrap;")}>{f.note}</span>
+                    <span style={S("font-size: 10.5px; font-weight: 700; color: #334d46; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;")}>{f.sig}</span>
+                    <span style={S("font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: #61746c; white-space: nowrap;")}>{f.note}</span>
                   </a>
                 ))}
               </div>
             </div>
           </div>
         </main>
-        <button onClick={v.toggleUi} style={v.hideUiBtnStyle}>{v.hideUiLabel}</button>
+        <button className="hud-visibility" onClick={v.toggleUi} style={v.hideUiBtnStyle}>{v.hideUiLabel}</button>
 
-        <footer style={v.footerStyle}>
+        <footer className="hud-dock" style={v.footerStyle}>
 
           <div style={S("display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%;")}>
             <div style={S("display: flex; align-items: center; gap: 14px; padding-right: 4px;")}>
-              <button onClick={v.toggleRun} style={v.runBtnStyle}>{v.runLabel}</button>
-              <button onClick={v.togglePause} style={v.pauseBtnStyle}>{v.pauseLabel}</button>
+              <button className="hud-run" onClick={v.toggleRun} style={v.runBtnStyle}>{v.runLabel}</button>
+              <button className="hud-pause" disabled={!this.state.running || this.state.busy} onClick={v.togglePause} style={v.pauseBtnStyle}>{v.pauseLabel}</button>
             </div>
-            <div style={S("flex: 1; min-width: 0; overflow: hidden; background: rgba(16,16,18,.5); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 3px 0; mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);")}>
-              <div data-crawl="wire" style={S("display: flex; width: max-content; will-change: transform; font-family: 'Baloo 2', cursive; font-size: 17px; font-weight: 600; color: #f2f3f4; white-space: nowrap;")}>
+            <div style={S("flex: 1; min-width: 0; overflow: hidden; background: #f0ead8; border: 1px solid #ded5ba; border-radius: 8px; padding: 3px 0; mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);")}>
+              <div data-crawl="wire" style={S("display: flex; width: max-content; will-change: transform; font-family: 'Baloo 2', cursive; font-size: 17px; font-weight: 600; color: #263f38; white-space: nowrap;")}>
                 <span style={S("padding-right: 46px;")}>{v.wireText}</span>
                 <span style={S("padding-right: 46px;")} aria-hidden="true">{v.wireText}</span>
                 <span style={S("padding-right: 46px;")} aria-hidden="true">{v.wireText}</span>
@@ -636,18 +636,18 @@ export default class IslandApp extends React.Component {
               wrapped). When the ends could shrink to nothing, a narrower window slid the
               Dashboard button over the last of the stats. */}
           <div style={S("display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr); align-items: center; gap: 0 20px; min-width: 0; width: 100%; padding: 1px 4px 0; white-space: nowrap;")}>
-            <span style={S("justify-self: start; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #a3a8ad;")}>round {v.round} · {v.clock}</span>
+            <span style={S("justify-self: start; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #526b65;")}>round {v.round} · {v.clock}</span>
             <div style={S("display: flex; align-items: baseline; justify-content: safe center; gap: 0 26px; min-width: 0; overflow: hidden;")}>
               {v.tape.map((t, i) => (
                 <span key={i} style={S("display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap;")}>
-                  <span style={S("font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #a3a8ad;")}>{t.name}</span>
-                  <span style={S(`font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: ${t.priceColor || "#f2f3f4"}; font-variant-numeric: tabular-nums;`)}>{t.price}</span>
+                  <span style={S("font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #526b65;")}>{t.name}</span>
+                  <span style={S(`font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: ${t.priceColor || "#263f38"}; font-variant-numeric: tabular-nums;`)}>{t.price}</span>
                   <span style={t.deltaStyle}>{t.delta}</span>
                 </span>
               ))}
             </div>
             <a href="/dashboard" onClick={this.openAdmin} title="The dials, the charts, every readout (Esc)"
-               style={S("justify-self: end; color: #f2f3f4; border: 1px solid rgba(255,255,255,.28); border-radius: 5px; padding: 2px 10px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; cursor: pointer;")}>Dashboard</a>
+               style={S("justify-self: end; color: #263f38; border: 1px solid rgba(255,255,255,.28); border-radius: 5px; padding: 2px 10px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; cursor: pointer;")}>Dashboard</a>
           </div>
         </footer>
 
@@ -655,7 +655,7 @@ export default class IslandApp extends React.Component {
         {v.selected && (
           <div onClick={v.closeLoc}
                style={S(`position: absolute; inset: 0; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 26px 22px; z-index: 40; animation: ${v.closing ? "veilout .2s ease both" : "veilin .24s ease both"};`)}>
-            <div onClick={e => e.stopPropagation()}
+            <div className="hud-location" onClick={e => e.stopPropagation()}
                  style={S(`width: 100%; max-width: 1240px; height: 100%; max-height: 820px; border-radius: 12px; overflow: hidden; background: ${v.selected.color}; box-shadow: 0 24px 60px rgba(0,0,0,.5); color: #fff; display: flex; flex-direction: column; animation: ${v.closing ? "cardout .2s ease both" : "cardin .3s cubic-bezier(.2,.7,.2,1) both"};`)}>
               <div style={S("flex: none; display: flex; align-items: center; gap: 14px; padding: 16px 20px 14px;")}>
                 <div style={S("min-width: 0; flex: 1;")}>

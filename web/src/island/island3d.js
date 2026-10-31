@@ -8,6 +8,8 @@
 //     have not already moved on an event of their own.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { createRenderQuality } from './renderQuality.js';
+import { addDaylight, SUN_DIRECTION, DAYLIGHT } from './daylight.js';
 import { addStrategyVillage } from './strategyVillage.js';
 import { subscribe } from '../store.js';
 import { subscribeActs, subscribeUpdates, subscribeRound, owns, setPopulation } from './pulse.js';
@@ -314,6 +316,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       this._unsubUpdates?.();
       this._unsubRound?.();
       cancelAnimationFrame(this._raf);
+      this.renderQuality?.dispose();
       if (this.renderer) this.renderer.dispose();
     }
 
@@ -334,18 +337,18 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       const dpr = window.devicePixelRatio || 1;
       if (this._lowPower) return Math.min(0.5, dpr);
       const px = Math.max(1, (this.clientWidth || 1) * (this.clientHeight || 1));
-      return Math.min(1.8, dpr, Math.sqrt(4.2e6 / px));
+      return Math.min(1.8, dpr, Math.sqrt(2.1e6 / px));
     }
 
     async boot() {
       this.THREE = THREE;
       const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x3aafc2, 0.0007);
+      scene.fog = new THREE.Fog(DAYLIGHT.horizon, 320, 950);
       this.scene = scene;
 
-      const camera = new THREE.PerspectiveCamera(42, 1, 1, 1600);
+      const camera = new THREE.PerspectiveCamera(42, 1, 1, 6000);
       this.camera = camera;
-      this.orbit = { r: 224, theta: 0.82, phi: 0.78, tr: 224, ttheta: 0.82, tphi: 0.78 };
+      this.orbit = { r: 240, theta: 0.82, phi: 1.29, tr: 240, ttheta: 0.82, tphi: 1.29 };
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
       // Keep the high-density surface that makes the water read as water rather than a
@@ -355,25 +358,31 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       renderer.setPixelRatio(this.pixelRatio());
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      renderer.setClearColor(0x278ea9, 1);
+      renderer.setClearColor(DAYLIGHT.horizon, 1);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
       this.canvasHost.appendChild(renderer.domElement);
       renderer.domElement.style.width = "100%";
       renderer.domElement.style.height = "100%";
       renderer.domElement.style.display = "block";
 
-      this.hemi = new THREE.HemisphereLight(0xe8f8ff, 0x51704a, 1.25);
+      this.hemi = new THREE.HemisphereLight(0xc5e5fa, 0xa9a07b, 0.95);
       scene.add(this.hemi);
-      scene.add(new THREE.AmbientLight(0xffffff, 0.25));
-      const sun = new THREE.DirectionalLight(0xfff3da, 1.7);
-      sun.position.set(-90, 130, 70);
+      const sun = new THREE.DirectionalLight(0xffe6bb, 2.35);
+      sun.position.copy(SUN_DIRECTION).multiplyScalar(175);
       sun.castShadow = true;
       sun.shadow.mapSize.set(2048, 2048);
-      sun.shadow.camera.left = -170; sun.shadow.camera.right = 170;
-      sun.shadow.camera.top = 170; sun.shadow.camera.bottom = -170;
+      sun.shadow.camera.left = -112; sun.shadow.camera.right = 112;
+      sun.shadow.camera.top = 112; sun.shadow.camera.bottom = -112;
       sun.shadow.camera.far = 420;
-      sun.shadow.bias = -0.0012;
+      sun.shadow.bias = -0.00015;
+      sun.shadow.normalBias = 0.12;
+      sun.shadow.radius = 2.5;
       scene.add(sun);
       this.sun = sun;
+      this.daylight = addDaylight(scene);
+      this.renderQuality = createRenderQuality(renderer, scene, camera);
 
       // ---- terrain ----
       const SIZE = 340, SEG = 330;
@@ -391,7 +400,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         if (y < -3) c.set(0x2c7f92);
         else if (y < 1.3) c.set(0xeadcae);
         else if (y < 3) c.setHex(0xf2d49a).lerp(new THREE.Color(0x87c94a), (y - 1.3) / 1.7);
-        else c.setHex(0x78bb35).lerp(new THREE.Color(0x9cce4b), fbm(x * 0.06, z * 0.06, 2));
+        else c.setHex(0x65ac31).lerp(new THREE.Color(0x8bc342), fbm(x * 0.06, z * 0.06, 2));
         if (slope > 0.45 && y > 2) c.lerp(new THREE.Color(0xa18a65), (slope - 0.45) * 1.5);
         c.multiplyScalar(0.97 + fbm(x * 0.3, z * 0.3, 2) * 0.06);
         colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
@@ -402,6 +411,21 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       // per-pixel detail they cannot carry (sand grain, grass clumping and rock
       // strata), the same way the water surface is upscaled. No extra geometry.
       const landMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+      landMat.onBeforeCompile = shader => {
+        shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vGround;')
+          .replace('#include <begin_vertex>','#include <begin_vertex>\nvGround=position;');
+        shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
+          varying vec3 vGround;
+          float grain(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+          float softNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+            return mix(mix(grain(i),grain(i+vec2(1,0)),f.x),mix(grain(i+vec2(0,1)),grain(i+vec2(1,1)),f.x),f.y);}`)
+          .replace('#include <color_fragment>',`#include <color_fragment>
+            float field=softNoise(vGround.xz*0.18);
+            float fleck=softNoise(vGround.xz*5.0);
+            float grass=smoothstep(2.0,5.5,vGround.y);
+            diffuseColor.rgb*=0.93+field*0.12+(fleck-0.5)*0.045;
+            diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(0.94,1.025,0.93),grass*field);`);
+      };
       const land = new THREE.Mesh(geo, landMat);
       land.castShadow = true;
       land.receiveShadow = true;
@@ -501,17 +525,14 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         uTime: { value: 0 },
         uHeight: { value: hTex },
         uSize: { value: SIZE },
-        uSun: { value: new THREE.Vector3(-90, 130, 70).normalize() },
-        uDeep: { value: new THREE.Color(0x167f9f) },
-        uMid: { value: new THREE.Color(0x22b6c5) },
-        uShallow: { value: new THREE.Color(0x7de3d4) },
+        uSun: { value: SUN_DIRECTION.clone() },
+        uDeep: { value: new THREE.Color(0x087f9f) },
+        uMid: { value: new THREE.Color(0x20b3bd) },
+        uShallow: { value: new THREE.Color(0x71d4bc) },
         uFoam: { value: new THREE.Color(0xf2fbff) },
         uCam: { value: new THREE.Vector3() },
-        // The colour the sea dissolves into at its rim: the renderer's clear colour exactly,
-        // so where the plane stops there is nothing to see stop. This material writes its
-        // colour straight to the canvas with no output transform, so it needs the value as it
-        // will be displayed (sRGB), not the linear one a THREE.Color holds.
-        uHorizon: { value: new THREE.Color(0x278ea9).convertLinearToSRGB() }
+        // Ocean and sky share a pale atmospheric horizon in the same color space.
+        uHorizon: { value: new THREE.Color(DAYLIGHT.sea) }
       };
       const waterMat = new THREE.ShaderMaterial({
         uniforms: waterUniforms,
@@ -524,7 +545,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
             float w1 = sin(p.x * 0.055 + uTime * 0.9) * cos(p.y * 0.041 - uTime * 0.7);
             float w2 = sin((p.x + p.y) * 0.031 - uTime * 1.3);
             float w3 = sin(p.y * 0.12 + uTime * 1.9) * 0.35;
-            float disp = w1 * 0.55 + w2 * 0.4 + w3 * 0.18;
+            float disp = w1 * 0.2 + w2 * 0.12 + w3 * 0.06;
             p.z += disp;
             vWave = vec2(w1, w2);
             vec4 wp = modelMatrix * vec4(p, 1.0);
@@ -562,7 +583,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
             // Past the rim the sea is the backdrop's own colour and nothing else: no noise,
             // no lighting. Zoomed right out this is most of the water on screen, so the wide
             // shot costs less than it did, not more.
-            if (r > 530.0) { gl_FragColor = vec4(uHorizon, 1.0); return; }
+            // Continue through output conversion even beyond the water shelf.
             // The seabed is only known inside the terrain's square, and at that square's edge
             // it is not yet as deep as the open sea is taken to be, which drew the square on
             // the water. Ease the depth out to the open sea's before the edge is reached.
@@ -581,35 +602,37 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
             float e = 0.55;
             float hxa = fbm((xz + vec2(e, 0.0)) * 0.19 + vec2(uTime * 0.16, uTime * 0.11));
             float hza = fbm((xz + vec2(0.0, e)) * 0.19 + vec2(uTime * 0.16, uTime * 0.11));
-            vec3 nrm = normalize(vec3((n1 - hxa) * 5.0, 1.0, (n1 - hza) * 5.0));
+            vec3 nrm = normalize(vec3((n1 - hxa) * 1.6, 1.0, (n1 - hza) * 1.6));
 
             // lighting: diffuse tint + sharp sun glint + fresnel sky
             vec3 viewDir = normalize(uCam - vWorld);
             vec3 halfv = normalize(uSun + viewDir);
-            float spec = pow(max(dot(nrm, halfv), 0.0), 220.0) * 1.5;
-            float sparkle = pow(max(dot(nrm, halfv), 0.0), 40.0) * 0.14 * (0.4 + n2);
+            float spec = pow(max(dot(nrm, halfv), 0.0), 110.0) * 0.21;
+            float sparkle = pow(max(dot(nrm, halfv), 0.0), 32.0) * 0.025 * (0.4 + n2);
             float fres = pow(1.0 - max(dot(nrm, viewDir), 0.0), 3.0);
-            col += vec3(0.10, 0.14, 0.18) * (n1 - 0.5) * 1.1;
-            col = mix(col, vec3(0.62, 0.84, 0.92), fres * 0.28);
+            col += vec3(0.035, 0.06, 0.06) * (n1 - 0.5);
+            col = mix(col, vec3(0.40, 0.67, 0.85), fres * 0.28);
             col += vec3(1.0, 0.97, 0.88) * (spec + sparkle);
 
             // shoreline foam: band over shallow ground, broken up by noise and swell
-            float band = 1.0 - smoothstep(0.0, 4.2, depth);
+            float band = 1.0 - smoothstep(0.0, 2.8, depth);
             float swell = 0.5 + 0.5 * sin(depth * 2.1 - uTime * 2.2 + n1 * 5.0);
             float foam = band * smoothstep(0.35, 0.85, swell * (0.55 + 0.7 * fbm(xz * 0.7 + uTime * 0.08)));
             foam += (1.0 - smoothstep(0.0, 0.7, depth)) * 0.55;
-            col = mix(col, uFoam, clamp(foam, 0.0, 0.9));
+            col = mix(col, uFoam, clamp(foam * 0.8, 0.0, 0.68));
 
             // …and the lit, choppy sea fades into that flat colour on the way out to the rim
-            col = mix(col, uHorizon, smoothstep(260.0, 520.0, r));
+            col = mix(col, uHorizon, smoothstep(180.0, 520.0, r));
 
             float alpha = clamp(0.62 + shore * 0.38 + foam * 0.4, 0.0, 1.0);
-            gl_FragColor = vec4(col, alpha);
+            gl_FragColor = vec4(col, 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
           }`,
-        transparent: true,
+        transparent: false,
         depthWrite: true
       });
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(1100, 1100, 150, 150), waterMat);
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000, 150, 150), waterMat);
       water.rotation.x = -Math.PI / 2;
       water.position.y = SEA;
       water.receiveShadow = false;
@@ -908,8 +931,9 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       if (Math.abs(this.renderer.getPixelRatio() - want) > 0.01) this.renderer.setPixelRatio(want);
       this.renderer.setSize(w, h, false);
       this.camera.aspect = w / h;
-      if (!this._cameraTouched) this.orbit.r = this.orbit.tr = Math.min(400, 224 * Math.max(1, h / w));
+      if (!this._cameraTouched) this.orbit.r = this.orbit.tr = Math.min(400, 240 * Math.max(1, h / w));
       this.camera.updateProjectionMatrix();
+      this.renderQuality?.resize(w, h, this.renderer.getPixelRatio());
     }
 
     // One instance per blob, rebuilt when the village changes size; the matrices, colours
@@ -1025,9 +1049,9 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       // lifts as the villagers trickle back out to their shifts, one by one.
       const dark = this.blobs.size ? crowd / this.blobs.size : 0;
       this.dusk = (this.dusk || 0) + (dark - (this.dusk || 0)) * Math.min(1, dt * 1.5);
-      this.sun.color.setRGB(1, 0.95 - 0.35 * this.dusk, 0.85 - 0.55 * this.dusk);
-      this.sun.intensity = 1.7 - 0.5 * this.dusk;
-      this.hemi.intensity = 1.25 - 0.55 * this.dusk;
+      this.sun.color.set(0xfff1cf);
+      this.sun.intensity = 2.35 - 0.1 * this.dusk;
+      this.hemi.intensity = 0.95;
     }
 
     loop() {
@@ -1157,8 +1181,10 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         this.waterUniforms.uTime.value = performance.now() * 0.001;
         this.waterUniforms.uCam.value.copy(this.camera.position);
       }
+      this.daylight?.update(now * 0.001);
       this.town?.update(now * 0.001);
-      this.renderer.render(this.scene, this.camera);
+      if (this._lowPower) this.renderer.render(this.scene, this.camera);
+      else this.renderQuality.render();
     }
   }
 

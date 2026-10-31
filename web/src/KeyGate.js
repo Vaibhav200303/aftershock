@@ -22,7 +22,7 @@ export function mountKeyGate(host) {
     const offered = CHOICES.filter(c => c.id === 'stub' || s.providers?.includes(c.id));
     const needsKey = picked !== 'stub' && !s.keys?.[picked];
     el.innerHTML = `<form class="kg-card" autocomplete="off">
-      <h1>Settlers of Solana</h1>
+      <h1>Aftershock</h1>
       <p class="kg-lede">30 villagers trading on Solana. Pick who plays them.</p>
       <fieldset ${busy ? 'disabled' : ''}>
         ${offered.map(c => `<label class="kg-opt ${c.id === picked ? 'on' : ''}">

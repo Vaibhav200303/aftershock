@@ -90,7 +90,7 @@ const txUrl = sig => last.chain.explorer.replace(/\/address\/[^?]+/, '/tx/' + si
 
 const MARKUP = `
 <div class="top">
-  <h1>agent-economy</h1>
+  <h1>Village dashboard</h1>
   <label class="pick" id="providerpick" hidden>provider <select id="providersel"></select></label>
   <label class="agents">agents <input id="agents" type="number" min="2" max="137" step="1" value="100"></label>
   <button id="btn" onclick="dash.toggle()">Start</button>

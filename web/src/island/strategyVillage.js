@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const C = { stone:0xb6ae97, light:0xe2d1ac, wood:0x68432c, oak:0xad773d, plaster:0xf1dbb0,
-  roof:0xd1703c, tile:0xdd8047, blue:0x307fa4, gold:0xe7b84a, glass:0x648f92, leaf:0x508638 };
+  roof:0xcd5b2e, tile:0xd56a34, blue:0x247da9, gold:0xe7b84a, glass:0x648f92, leaf:0x508638 };
 const seeded = (a,b=0) => { const v=Math.sin(a*127.1+b*311.7)*43758.5453;return v-Math.floor(v); };
 
 // A common material language for every building, including the five live work locations.
@@ -29,10 +29,18 @@ export function addStrategyVillage(scene, height, areas) {
     }
     const t=new THREE.CanvasTexture(canvas);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;
   };
-  const textures={stone:texture('stone'),wood:texture('wood'),plaster:texture('plaster')};
+  const textures={stone:texture('stone'),wood:texture('wood'),plaster:texture('plaster'),clay:texture('plaster')};
+  const relief=Object.fromEntries(Object.entries(textures).map(([kind,t])=>{
+    const bump=t.clone();bump.colorSpace=THREE.NoColorSpace;bump.needsUpdate=true;return [kind,bump];
+  }));
   const mat=(color,kind='plain') => {
+    if(kind==='plain'&&[C.roof,C.tile,0xd06a35,C.blue,0x638c83].includes(color)) kind='clay';
     const key=`${color}:${kind}`;
-    if(!materials.has(key)) materials.set(key,new THREE.MeshStandardMaterial({color,roughness:0.88,map:textures[kind]||null}));
+    if(!materials.has(key)) materials.set(key,new THREE.MeshStandardMaterial({color,
+      roughness:kind==='wood'?0.76:kind==='stone'?0.92:kind==='clay'?0.64:0.85,
+      map:textures[kind]||null,bumpMap:relief[kind]||null,
+      bumpScale:kind==='stone'?0.09:kind==='wood'?0.055:0.025,
+      roughnessMap:relief[kind]||null}));
     return materials.get(key);
   };
   const mesh=(g,geo,color,kind='plain') => {const m=new THREE.Mesh(geo,mat(color,kind));g.add(m);return m;};
@@ -77,7 +85,7 @@ export function addStrategyVillage(scene, height, areas) {
       for(let row=0;row<rows;row++) for(let col=0;col<cols;col++) {
         const t=(row+0.5)/rows,z=(col+0.5)/cols*(d+1.4)-(d+1.4)/2;
         const tile=box(g,slope/rows+0.14,0.22,(d+1.4)/cols-0.035,side*half*t,y+rise*(1-t)+0.25,z,
-          color===C.roof ? [C.roof,C.tile,0xd87940][Math.floor(seeded(row*17+col,w)*3)] : color);
+          color===C.roof ? [C.roof,C.tile,0xd06a35][Math.floor(seeded(row*17+col,w)*3)] : color);
         tile.rotation.z=-side*angle;
       }
       for(const z of [-(d/2+0.8),d/2+0.8]) beam(g,[0,y+rise+0.25,z],[side*half,y,z],0.32,C.oak);
