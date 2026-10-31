@@ -9,6 +9,7 @@ import { subscribe, command } from '../store.js';
 import { subscribeActs, subscribeUpdates, subscribeRound, queued } from './pulse.js';
 import { S } from './css.js';
 import { LOCS, bucketOf, ACT_LABEL, SHORT, SKIN, HAIR, SHIRT, KINDS, EMPTY_SIM } from './constants.js';
+import DisasterStatus from '../disasters/DisasterStatus.jsx';
 import AgentInspector from './AgentInspector.jsx';
 import './island3d.js';   // defines <island-3d>
 import { bodyOf, moodOf, drawBlob } from './blob.js';
@@ -652,7 +653,7 @@ export default class IslandApp extends React.Component {
           </div>
         </footer>
 
-        {!this.state.uiHidden && <AgentInspector />}
+        {!this.state.uiHidden && <><AgentInspector /><DisasterStatus /></>}
         {/* The place card: the big one, flat in the place's own colour, holding the lineup. */}
         {v.selected && (
           <div onClick={v.closeLoc}

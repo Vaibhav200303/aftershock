@@ -7,6 +7,7 @@
 //     whole village off together. /state is still the truth, but only for villagers who
 //     have not already moved on an event of their own.
 import * as THREE from 'three';
+import {createDisasterEffects} from '../disasters/effects.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {plushMaterial} from './plushMaterial.js';
 import { createRenderQuality } from './renderQuality.js';
@@ -312,6 +313,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       this.boot();
     }
     disconnectedCallback() {
+      this.disasters?.dispose();
       this._unsub?.();
       this._unsubActs?.();
       this._unsubUpdates?.();
@@ -524,6 +526,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
 
       const waterUniforms = {
         uTime: { value: 0 },
+        uStorm: { value: 0 },
         uHeight: { value: hTex },
         uSize: { value: SIZE },
         uSun: { value: SUN_DIRECTION.clone() },
@@ -539,6 +542,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         uniforms: waterUniforms,
         vertexShader: `
           uniform float uTime;
+          uniform float uStorm;
           varying vec3 vWorld;
           varying vec2 vWave;
           void main() {
@@ -547,7 +551,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
             float w2 = sin((p.x + p.y) * 0.031 - uTime * 1.3);
             float w3 = sin(p.y * 0.12 + uTime * 1.9) * 0.35;
             float disp = w1 * 0.2 + w2 * 0.12 + w3 * 0.06;
-            p.z += disp;
+            p.z += disp * (1.0 + uStorm * 3.0);
             vWave = vec2(w1, w2);
             vec4 wp = modelMatrix * vec4(p, 1.0);
             vWorld = wp.xyz;
@@ -555,6 +559,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
           }`,
         fragmentShader: `
           uniform float uTime;
+          uniform float uStorm;
           uniform float uSize;
           uniform sampler2D uHeight;
           uniform vec3 uSun, uCam, uDeep, uMid, uShallow, uFoam, uHorizon;
@@ -603,7 +608,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
             float e = 0.55;
             float hxa = fbm((xz + vec2(e, 0.0)) * 0.19 + vec2(uTime * 0.16, uTime * 0.11));
             float hza = fbm((xz + vec2(0.0, e)) * 0.19 + vec2(uTime * 0.16, uTime * 0.11));
-            vec3 nrm = normalize(vec3((n1 - hxa) * 1.6, 1.0, (n1 - hza) * 1.6));
+            vec3 nrm = normalize(vec3((n1 - hxa) * (1.6 + uStorm * 3.0), 1.0, (n1 - hza) * (1.6 + uStorm * 3.0)));
 
             // lighting: diffuse tint + sharp sun glint + fresnel sky
             vec3 viewDir = normalize(uCam - vWorld);
@@ -847,6 +852,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
 
       // The shared store polls /state and holds the one EventSource; a settled round reaches
       // us the moment it lands, and the scene keeps its last picture if the server goes away.
+      this.disasters = createDisasterEffects({scene, height, areas: this.areas, sun: this.sun, hemi: this.hemi, water: waterUniforms, land});
       this._unsub = subscribe(s => this.apply(s));
       // …and every villager's own answer reaches us the moment THAT villager answers.
       this._unsubActs = subscribeActs(act => this.onAct(act));
@@ -1217,8 +1223,9 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         this.waterUniforms.uTime.value = performance.now() * 0.001;
         this.waterUniforms.uCam.value.copy(this.camera.position);
       }
-      this.daylight?.update(now * 0.001);
+      this.daylight?.update(now * 0.001, this.disasters?.weather);
       this.town?.update(now * 0.001);
+      this.disasters?.update(now * 0.001, this._lowPower, 2.35 - .1 * (this.dusk || 0));
       if (this._lowPower) this.renderer.render(this.scene, this.camera);
       else this.renderQuality.render();
     }

@@ -4,6 +4,7 @@
 // shared /state store instead of polling on its own, the inline handlers go through the
 // `dash` namespace rather than globals, and it draws nothing while it is out of view.
 import './admin.css';
+import {acceptDisasters} from '../disasters/state.js';
 import { subscribe, refresh as refreshState } from '../store.js';
 import { mountSwarm } from './Swarm.js';
 
@@ -735,6 +736,7 @@ async function loadDials() {
 async function post(body) {
   dials = await (await fetch('/tunables', { method: 'POST', headers: { 'content-type': 'application/json' },
                                             body: JSON.stringify(body) })).json();
+  acceptDisasters(dials);
   drawDials();
   refreshState();
 }

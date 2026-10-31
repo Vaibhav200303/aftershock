@@ -42,8 +42,16 @@ export function addDaylight(scene) {
     cloud.rotation.y=i*0.9;cloud.castShadow=false;scene.add(cloud);clouds.push({cloud,x:x*3,z:z*3});
   }
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
-  return {update(time){
+  const zenith=new THREE.Color(DAYLIGHT.zenith),horizon=new THREE.Color(DAYLIGHT.horizon),overcast=new THREE.Color(0x7395a7),cloudWhite=cloudMaterial.color.clone();
+  let previous=null,wind=0;
+  return {update(time,weather={}){
     const t=reduced.matches?0:time;
-    clouds.forEach(({cloud,x,z},i)=>{cloud.position.x=x+Math.sin(t*0.018+i)*3;cloud.position.z=z+Math.cos(t*0.013+i)*2;});
+    const storm=weather.hurricane||0;
+    const dt=Math.min(.15,previous==null?0:time-previous);previous=time;
+    if(!reduced.matches)wind+=dt*storm*.4;
+    sky.material.uniforms.uZenith.value.copy(zenith).lerp(overcast,storm*.8);
+    sky.material.uniforms.uHorizon.value.copy(horizon).lerp(overcast,storm*.55);
+    cloudMaterial.color.copy(cloudWhite).lerp(overcast,storm*.5);
+    clouds.forEach(({cloud,x,z},i)=>{cloud.position.x=x+Math.sin(t*0.018+wind+i)*(3+storm*8);cloud.position.z=z+Math.cos(t*0.013+wind+i)*(2+storm*5);});
   }};
 }
