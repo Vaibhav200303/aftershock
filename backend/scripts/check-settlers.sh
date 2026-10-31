@@ -34,6 +34,17 @@ for _ in $(seq 60); do
   sleep 1
 done
 
+# RPC answering is not the same as blocks being produced. Without this the first burst
+# of transactions races the validator's startup and dies on "Unable to obtain a new
+# blockhash", which looks like a bug in the program and is not one.
+LAST=0
+for _ in $(seq 60); do
+  NOW=$(solana slot --url "$RPC" 2>/dev/null || echo 0)
+  if [ "${NOW:-0}" -gt 8 ] && [ "${NOW:-0}" -gt "$LAST" ]; then break; fi
+  LAST=${NOW:-0}
+  sleep 1
+done
+
 solana airdrop 100 --url "$RPC" --keypair ~/.config/solana/id.json >/dev/null
 echo "program $PROGRAM_ID loaded"
 
