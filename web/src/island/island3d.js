@@ -8,6 +8,7 @@
 //     have not already moved on an event of their own.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { addStrategyVillage } from './strategyVillage.js';
 import { subscribe } from '../store.js';
 import { subscribeActs, subscribeUpdates, subscribeRound, owns, setPopulation } from './pulse.js';
 import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, SAD, DECIDING, drawFace, moodOf, BLOB, bodyOf, blobParts } from './blob.js';
@@ -54,22 +55,12 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
     const d = Math.hypot(x, z);
     const ang = Math.atan2(z, x);
     const coast = fbm(Math.cos(ang) * 1.9 + 5, Math.sin(ang) * 1.9 + 9, 4);
-    const R = 62 + coast * 30;
-    const inland = 1 - sstep(R * 0.5, R, d);
-    const base = fbm(x * 0.032 + 11, z * 0.032 + 7, 5);
-    let y = (base * 0.8 + 0.2) * inland * 19;
-    const dc = Math.hypot((x + 46) * 1.05, (z + 26) * 0.95);        // eroded crater ridge
-    y += Math.exp(-Math.pow(dc - 14, 2) / 62) * 21 * inland;
-    y -= Math.exp(-Math.pow(dc, 2) / 90) * 7 * inland;               // crater bowl
-    const spine = Math.max(0, 1 - Math.hypot((x - 10) * 0.85, (z + 2) * 1.25) / 44);
-    y += Math.pow(spine, 1.8) * 25 * inland;                          // main ridge
-    y += fbm(x * 0.11 + 3, z * 0.11 + 2, 4) * 3.4 * inland;           // gullies
-    const ridged = 1 - Math.abs(fbm(x * 0.05 + 21, z * 0.05 + 13, 4) * 2 - 1);
-    y += Math.pow(ridged, 2.2) * 5.5 * inland;                        // eroded spurs
-    y += fbm(x * 0.34 + 41, z * 0.34 + 29, 3) * 1.1 * inland;         // fine surface detail
-    y -= 11 * sstep(R * 0.93, R + 30, d);                             // shelf drops under water
-    y -= 14 * sstep(R + 26, R + 90, d);
-    return y;
+    const R = 72 + coast * 22;
+    // A broad playable meadow with a sculpted cliff shelf, rather than a volcano.
+    const meadow = 7.5 + fbm(x * 0.025 + 11, z * 0.025 + 7, 3) * 1.8;
+    return meadow * (1 - sstep(R - 15, R - 6, d))
+      + 1.6 * sstep(R - 15, R - 6, d) * (1 - sstep(R - 4, R + 5, d))
+      - 20 * sstep(R, R + 46, d);
   }
 
   // The coast road: a loop of waypoints just above the beach. Blobs walk area -> road -> along
@@ -349,12 +340,12 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
     async boot() {
       this.THREE = THREE;
       const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x146b87, 0.0022);
+      scene.fog = new THREE.FogExp2(0x3aafc2, 0.0007);
       this.scene = scene;
 
       const camera = new THREE.PerspectiveCamera(42, 1, 1, 1600);
       this.camera = camera;
-      this.orbit = { r: 190, theta: -0.46, phi: 0.92, tr: 190, ttheta: -0.46, tphi: 0.92 };
+      this.orbit = { r: 224, theta: 0.82, phi: 0.78, tr: 224, ttheta: 0.82, tphi: 0.78 };
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
       // Keep the high-density surface that makes the water read as water rather than a
@@ -364,7 +355,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       renderer.setPixelRatio(this.pixelRatio());
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      renderer.setClearColor(0x0b4a64, 1);
+      renderer.setClearColor(0x278ea9, 1);
       this.canvasHost.appendChild(renderer.domElement);
       renderer.domElement.style.width = "100%";
       renderer.domElement.style.height = "100%";
@@ -376,7 +367,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       const sun = new THREE.DirectionalLight(0xfff3da, 1.7);
       sun.position.set(-90, 130, 70);
       sun.castShadow = true;
-      sun.shadow.mapSize.set(1024, 1024);
+      sun.shadow.mapSize.set(2048, 2048);
       sun.shadow.camera.left = -170; sun.shadow.camera.right = 170;
       sun.shadow.camera.top = 170; sun.shadow.camera.bottom = -170;
       sun.shadow.camera.far = 420;
@@ -399,15 +390,10 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         const slope = Math.min(1, (Math.abs(y - hx) + Math.abs(y - hz)) / 2.6);
         if (y < -3) c.set(0x2c7f92);
         else if (y < 1.3) c.set(0xeadcae);
-        else if (y < 3) c.setHex(0xdfd0a0).lerp(new THREE.Color(0x8fbf62), (y - 1.3) / 1.7);
-        else if (y < 9) c.setHex(0x86c266).lerp(new THREE.Color(0x5da14b), (y - 3) / 6);
-        else if (y < 19) c.setHex(0x5da14b).lerp(new THREE.Color(0x7d8348), (y - 9) / 10);
-        else if (y < 30) c.setHex(0x7a6a4e).lerp(new THREE.Color(0x6b5643), (y - 19) / 11);
-        else c.setHex(0x584639);
-        if (slope > 0.45 && y > 2) c.lerp(new THREE.Color(0x7d6a55), (slope - 0.45) * 1.5);
-        if (y > -0.9 && y < 0.9) c.lerp(new THREE.Color(0xf4fbff), 0.42 - Math.abs(y) * 0.3);   // surf line
-        const band = Math.abs((y % 3.5)) < 0.22 && y > 1 ? 0.9 : 1;      // faint topographic contours
-        c.multiplyScalar(band * (0.94 + fbm(x * 0.5, z * 0.5, 2) * 0.12));
+        else if (y < 3) c.setHex(0xf2d49a).lerp(new THREE.Color(0x87c94a), (y - 1.3) / 1.7);
+        else c.setHex(0x78bb35).lerp(new THREE.Color(0x9cce4b), fbm(x * 0.06, z * 0.06, 2));
+        if (slope > 0.45 && y > 2) c.lerp(new THREE.Color(0xa18a65), (slope - 0.45) * 1.5);
+        c.multiplyScalar(0.97 + fbm(x * 0.3, z * 0.3, 2) * 0.06);
         colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
       }
       geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
@@ -416,80 +402,6 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       // per-pixel detail they cannot carry (sand grain, grass clumping and rock
       // strata), the same way the water surface is upscaled. No extra geometry.
       const landMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
-      landMat.onBeforeCompile = (sh) => {
-        sh.vertexShader = sh.vertexShader
-          .replace("#include <common>", "#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;")
-          .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n  vWNrm = normalize(mat3(modelMatrix) * objectNormal);");
-        sh.fragmentShader = sh.fragmentShader
-          .replace("#include <common>", `#include <common>
-            varying vec3 vWPos;
-            varying vec3 vWNrm;
-            float vRough = 0.9;
-            float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-            float vn(vec2 p){
-              vec2 i = floor(p), f = fract(p);
-              vec2 u = f * f * (3.0 - 2.0 * f);
-              return mix(mix(h21(i), h21(i + vec2(1,0)), u.x), mix(h21(i + vec2(0,1)), h21(i + vec2(1,1)), u.x), u.y);
-            }
-            float fb(vec2 p, int oct){
-              float s = 0.0, a = 0.5;
-              for (int i = 0; i < 6; i++) { if (i >= oct) break; s += a * vn(p); p *= 2.07; a *= 0.5; }
-              return s;
-            }
-            // worley-ish cell noise for grass clumps and rock facets
-            float cells(vec2 p){
-              vec2 ip = floor(p), fp = fract(p);
-              float d = 1.0;
-              for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-                vec2 g = vec2(float(x), float(y));
-                vec2 o = vec2(h21(ip + g), h21(ip + g + 7.3));
-                d = min(d, length(g + o - fp));
-              }
-              return d;
-            }`)
-          .replace("#include <color_fragment>", `#include <color_fragment>
-            {
-              vec3 wp = vWPos;
-              float alt = wp.y;
-              float slope = 1.0 - clamp(vWNrm.y, 0.0, 1.0);
-
-              // --- sand: fine grain + wind ripples parallel to the shore ---
-              float grain = fb(wp.xz * 9.0, 3);
-              float ripple = sin(wp.x * 1.1 + wp.z * 0.7 + fb(wp.xz * 0.35, 2) * 6.0) * 0.5 + 0.5;
-              float sandMask = 1.0 - smoothstep(0.8, 3.4, alt);
-              vec3 sandDetail = vec3(0.09, 0.075, 0.05) * (grain - 0.5) * 2.0
-                              + vec3(0.05, 0.045, 0.03) * (ripple - 0.5);
-
-              // --- grass: clumped cells + blade-scale speckle, dries out with altitude ---
-              float clump = 1.0 - cells(wp.xz * 0.55);
-              float blades = fb(wp.xz * 14.0, 3);
-              float grassMask = smoothstep(1.8, 4.0, alt) * (1.0 - smoothstep(13.0, 21.0, alt)) * (1.0 - smoothstep(0.42, 0.72, slope));
-              vec3 grassDetail = vec3(-0.07, 0.10, -0.05) * (clump - 0.45) * 1.25
-                               + vec3(0.045, 0.06, 0.03) * (blades - 0.5) * 0.9;
-
-              // --- rock: stratified bands + facet breakup on steep or high ground ---
-              float strata = fb(vec2(wp.x * 0.35 + wp.z * 0.12, alt * 1.45), 4);
-              float facet = 1.0 - cells(wp.xz * 1.25 + alt * 0.4);
-              float rockMask = clamp(smoothstep(0.38, 0.78, slope) + smoothstep(15.0, 27.0, alt), 0.0, 1.0);
-              vec3 rockDetail = vec3(0.13, 0.115, 0.10) * (strata - 0.5) * 1.5
-                              + vec3(0.08, 0.075, 0.07) * (facet - 0.5);
-
-              // --- damp sand right at the tideline ---
-              float wet = (1.0 - smoothstep(0.0, 1.7, alt)) * step(0.02, alt);
-              diffuseColor.rgb *= mix(1.0, 0.72, wet);
-
-              diffuseColor.rgb += sandDetail * sandMask
-                                + grassDetail * grassMask
-                                + rockDetail * rockMask;
-
-              // large-scale mottling so the whole island never reads flat
-              diffuseColor.rgb *= 0.9 + fb(wp.xz * 0.075, 4) * 0.22;
-              diffuseColor.rgb = clamp(diffuseColor.rgb, 0.0, 1.0);
-
-              vRough = clamp(0.62 + (1.0 - wet) * 0.3 + (strata - 0.5) * 0.25 * rockMask, 0.35, 1.0);
-            }`)
-          .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n  roughnessFactor = vRough;");
-      };
       const land = new THREE.Mesh(geo, landMat);
       land.castShadow = true;
       land.receiveShadow = true;
@@ -513,32 +425,13 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         out.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
         return out;
       };
-      const TRUNK_H = 4.6;
-      // one frond: a long flattened cone, tipped outward and drooping at the end
-      const frondGeo = () => {
-        const g = new THREE.ConeGeometry(0.42, 3.5, 4, 5);
-        g.scale(0.16, 1, 1);              // thin axis becomes the vertical one below
-        g.rotateZ(-Math.PI / 2);          // lie along +x, base at the crown
-        g.translate(1.75, 0, 0);
-        const pos = g.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          const x = pos.getX(i), t = Math.max(0, x / 3.5);
-          pos.setY(i, pos.getY(i) - t * t * 2.1);      // the droop grows toward the tip
-          pos.setX(i, x * (1 - t * t * 0.18));
-        }
-        g.computeVertexNormals();
+      const TRUNK_H = 2.8;
+      const treeGeo = mergeGeos([0, 1, 2].map(i => {
+        const g = new THREE.ConeGeometry(3.4 - i * 0.65, 4.5, 7);
+        g.translate(0, 4.2 + i * 2.2, 0);
         return g;
-      };
-      const fronds = [];
-      for (let f = 0; f < 9; f++) {
-        const g = frondGeo();
-        g.rotateZ((0.26 + (f % 3) * 0.12));           // some fronds ride higher than others
-        g.rotateY(f / 9 * Math.PI * 2 + 0.35);
-        fronds.push(g);
-      }
-      const treeGeo = mergeGeos(fronds);
-      treeGeo.translate(0, TRUNK_H, 0);
-      const PALMS = 300;
+      }));
+      const PALMS = 36;
       const trees = new THREE.InstancedMesh(treeGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }), PALMS);
       trees.castShadow = true;
       trees.receiveShadow = true;
@@ -563,7 +456,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         const x = (hash2(i * 1.7, 3.1) - 0.5) * 210;
         const z = (hash2(i * 2.3, 9.7) - 0.5) * 210;
         const hgt = height(x, z);
-        if (hgt < 2.2 || hgt > 21) continue;
+        if (hgt < 5 || hgt > 21 || Math.hypot(x, z) < 68) continue;
         const sl = Math.abs(hgt - height(x + 1.5, z)) + Math.abs(hgt - height(x, z + 1.5));
         if (sl > 4.2) continue;
         if (hash2(i * 5.3, 1.9) > 0.055) continue;
@@ -575,7 +468,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         m4.compose(tp, q, sc);
         trees.setMatrixAt(placed, m4);
         trunks.setMatrixAt(placed, m4);
-        tcol.setHSL(0.255 + hash2(i, 11) * 0.045, 0.40 + hash2(i, 13) * 0.18, 0.26 + hash2(i, 17) * 0.11);
+        tcol.setHSL(0.29 + hash2(i, 11) * 0.035, 0.62, 0.28 + hash2(i, 17) * 0.12);
         trees.setColorAt(placed, tcol);
         placed++;
       }
@@ -609,8 +502,8 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         uHeight: { value: hTex },
         uSize: { value: SIZE },
         uSun: { value: new THREE.Vector3(-90, 130, 70).normalize() },
-        uDeep: { value: new THREE.Color(0x0a4c6b) },
-        uMid: { value: new THREE.Color(0x1590b1) },
+        uDeep: { value: new THREE.Color(0x167f9f) },
+        uMid: { value: new THREE.Color(0x22b6c5) },
         uShallow: { value: new THREE.Color(0x7de3d4) },
         uFoam: { value: new THREE.Color(0xf2fbff) },
         uCam: { value: new THREE.Vector3() },
@@ -618,7 +511,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         // so where the plane stops there is nothing to see stop. This material writes its
         // colour straight to the canvas with no output transform, so it needs the value as it
         // will be displayed (sRGB), not the linear one a THREE.Color holds.
-        uHorizon: { value: new THREE.Color(0x0b4a64).convertLinearToSRGB() }
+        uHorizon: { value: new THREE.Color(0x278ea9).convertLinearToSRGB() }
       };
       const waterMat = new THREE.ShaderMaterial({
         uniforms: waterUniforms,
@@ -755,206 +648,14 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       // per frame was a hundred string parses and sRGB conversions a frame for nothing
       this.areaRGB = new Map(AREAS.map(a => { const col = new THREE.Color(a.color); return [a.id, [col.r, col.g, col.b]]; }));
 
-      // ---- pier off the beach by the docks ----
-      {
-        const dirx = -0.879, dirz = 0.477;
-        let sx = 0, sz = 0;
-        for (let t = 0; t < 120; t++) {
-          const px = -70 + dirx * t * 0.6, pz = 38 + dirz * t * 0.6;
-          if (height(px, pz) < 0.35) { sx = px; sz = pz; break; }
-        }
-        const len = 30, wdt = 5.4, deckY = 2.1;
-        const ang = Math.atan2(dirz, dirx);
-        const wood = new THREE.MeshStandardMaterial({ color: 0xb08a5e, roughness: 0.95, metalness: 0 });
-        const woodDark = new THREE.MeshStandardMaterial({ color: 0x7d5c3c, roughness: 1, metalness: 0 });
-        const pier = new THREE.Group();
-        const planks = 14;
-        for (let i = 0; i < planks; i++) {
-          const p = new THREE.Mesh(new THREE.BoxGeometry(len / planks * 0.86, 0.35, wdt), i % 3 === 0 ? woodDark : wood);
-          p.position.set(-len / 2 + (i + 0.5) * (len / planks), deckY, 0);
-          p.castShadow = true; p.receiveShadow = true;
-          pier.add(p);
-        }
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.3, 0.3), woodDark);
-        rail.position.set(0, deckY + 1.1, wdt / 2 - 0.2); pier.add(rail);
-        const rail2 = rail.clone(); rail2.position.z = -wdt / 2 + 0.2; pier.add(rail2);
-        for (let i = 0; i <= 5; i++) {
-          const px = -len / 2 + (i * len) / 5;
-          [-1, 1].forEach(s => {
-            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 9, 7), woodDark);
-            post.position.set(px, deckY - 3.6, s * (wdt / 2 - 0.4));
-            post.castShadow = true;
-            pier.add(post);
-            if (i % 5 === 0 || i === 2) {
-              const railPost = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.5, 0.3), woodDark);
-              railPost.position.set(px, deckY + 0.6, s * (wdt / 2 - 0.2));
-              pier.add(railPost);
-            }
-          });
-        }
-        const hut = new THREE.Mesh(new THREE.BoxGeometry(5, 3.2, 4.6), new THREE.MeshStandardMaterial({ color: 0xe4d3ad, roughness: 1 }));
-        hut.position.set(-len / 2 + 3.4, deckY + 1.8, 0);
-        hut.castShadow = true;
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(4.2, 2.1, 4), new THREE.MeshStandardMaterial({ color: 0x9a5f45, roughness: 1 }));
-        roof.position.set(hut.position.x, deckY + 4.4, 0);
-        roof.rotation.y = Math.PI / 4;
-        roof.castShadow = true;
-        pier.add(hut); pier.add(roof);
-        const boat = new THREE.Mesh(new THREE.SphereGeometry(1.9, 10, 7, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.58), new THREE.MeshStandardMaterial({ color: 0xf0f3ef, roughness: 0.8, side: THREE.DoubleSide }));
-        boat.scale.set(1.5, 0.8, 0.8);
-        boat.position.set(len / 2 - 6, 0.6, wdt / 2 + 2.6);
-        pier.add(boat);
-        pier.position.set(sx + dirx * len / 2, 0, sz + dirz * len / 2);
-        pier.rotation.y = -ang;
-        scene.add(pier);
-      }
-
-      // ---- one small low-poly building at each of the other destinations, same
-      // box-walls-and-pyramid-roof style as the dock hut above ----
-      {
-        const strut = (a, b, thick, mat) => {
-          const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], len = Math.hypot(dx, dy, dz);
-          const m = new THREE.Mesh(new THREE.BoxGeometry(thick, len, thick), mat);
-          m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
-          m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize());
-          m.castShadow = true; m.receiveShadow = true;
-          return m;
-        };
-        // the ground under a rotated footprint, corner to corner. A single centre sample
-        // says nothing about what the far corners sit on, which is how a building ends up
-        // with one wall buried and the opposite one hanging in the air.
-        const groundUnder = (x, z, w, d, rot) => {
-          const c = Math.cos(rot), sn = Math.sin(rot);
-          let lo = Infinity, hi = -Infinity;
-          for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-            const lx = a * w / 2, lz = b * d / 2;
-            const y = height(x + lx * c + lz * sn, z - lx * sn + lz * c);
-            if (y < lo) lo = y;
-            if (y > hi) hi = y;
-          }
-          return { lo, hi };
-        };
-        // the graded pad for this destination. Standing on the high corner of what the
-        // pad actually came out as, rather than on its nominal level, keeps the floor clear
-        // of the ground even where the ease-out clips a corner of the footprint.
-        const flatSpot = (cx, cz, w = 5, d = 4.6, rot = 0) => {
-          const p = padFor(cx, cz) || { x: cx, z: cz };
-          const g = groundUnder(p.x, p.z, w, d, rot);
-          return [p.x, p.z, g.hi, g.hi - g.lo];
-        };
-        const cabin = (cx, cz, { w = 5, d = 4.6, h = 3.2, roofH = 2.1, wall = 0xe4d3ad, roof = 0x9a5f45, rot = 0 } = {}) => {
-          const [x, z, gy, relief] = flatSpot(cx, cz, w, d, rot);
-          const group = new THREE.Group();
-          const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: wall, roughness: 1 }));
-          box.position.y = h / 2; box.castShadow = true; box.receiveShadow = true;
-          const cone = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.62, roofH, 4), new THREE.MeshStandardMaterial({ color: roof, roughness: 1 }));
-          cone.position.y = h + roofH / 2 - 0.1; cone.rotation.y = Math.PI / 4; cone.castShadow = true;
-          // a stone footing carries the drop on the downhill side: the floor stays level
-          // on the high corner and nothing is left hanging over the slope
-          const foot = relief + 0.9;
-          const plinth = new THREE.Mesh(new THREE.BoxGeometry(w * 1.08, foot, d * 1.08), new THREE.MeshStandardMaterial({ color: 0x9b9081, roughness: 1 }));
-          plinth.position.y = -foot / 2 + 0.06;
-          plinth.castShadow = true; plinth.receiveShadow = true;
-          group.add(box, cone, plinth);
-          group.position.set(x, gy, z);
-          group.rotation.y = rot;
-          scene.add(group);
-          return { x, y: gy, z };
-        };
-
-        // forest: a woodcutter's cabin with a log pile stacked outside
-        {
-          const b = cabin(40, -48, { w: 4.4, d: 4, h: 2.9, roofH: 1.9, wall: 0x8a6a45, roof: 0x4a3a26, rot: 0.6 });
-          const logMat = [new THREE.MeshStandardMaterial({ color: 0xb08a5e, roughness: 1 }), new THREE.MeshStandardMaterial({ color: 0x7d5c3c, roughness: 1 })];
-          const logGeo = new THREE.CylinderGeometry(0.32, 0.32, 3, 7);
-          [[0, 0], [1, 0], [2, 0], [0.5, 1], [1.5, 1], [1, 2]].forEach(([col, row], i) => {
-            const log = new THREE.Mesh(logGeo, logMat[i % 2]);
-            log.rotation.z = Math.PI / 2;
-            log.position.set(b.x + 3.6 + col * 0.66, b.y + 0.32 + row * 0.58, b.z - 1.2);
-            log.castShadow = true; log.receiveShadow = true;
-            scene.add(log);
-          });
-        }
-
-        // workshop: a bigger shed with a stone chimney and a workbench
-        {
-          const b = cabin(60, 8, { w: 6, d: 5, h: 3.6, roofH: 2.3, wall: 0xd9c9a0, roof: 0xb5652f, rot: -0.4 });
-          const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.9, 3.4, 0.9), new THREE.MeshStandardMaterial({ color: 0x8f8378, roughness: 1 }));
-          chimney.position.set(b.x - 2, b.y + 3.6, b.z + 1.6);
-          chimney.castShadow = true;
-          scene.add(chimney);
-          const bench = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 1.1), new THREE.MeshStandardMaterial({ color: 0x7d5c3c, roughness: 1 }));
-          bench.position.set(b.x + 3.6, b.y + 0.45, b.z - 1);
-          bench.castShadow = true; bench.receiveShadow = true;
-          scene.add(bench);
-        }
-
-        // building site: just a frame going up, beams and a stack of spare boards, no walls yet
-        {
-          const frameRot = 0.3;
-          const wx = 3, dz = 2.4, wallH = 3.2, ridgeH = 4.7;
-          const [x, z, y] = flatSpot(-16, -50, wx * 2, dz * 2, frameRot);
-          // each post reaches down to the ground it actually stands on, so a corner over
-          // lower ground grows a longer leg instead of floating
-          const fc = Math.cos(frameRot), fsn = Math.sin(frameRot);
-          const footY = (lx, lz) => Math.min(0, height(x + lx * fc + lz * fsn, z - lx * fsn + lz * fc) - y) - 0.15;
-          const corners = [[-wx, 0, -dz], [wx, 0, -dz], [wx, 0, dz], [-wx, 0, dz]]
-            .map(([a, , b]) => [a, footY(a, b), b]);
-          const tops = corners.map(([cx, , cz]) => [cx, wallH, cz]);
-          const ridgeA = [0, ridgeH, -dz], ridgeB = [0, ridgeH, dz];
-          const beam = new THREE.MeshStandardMaterial({ color: 0xc79a5e, roughness: 1 });
-          const beamDark = new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 1 });
-          const frame = new THREE.Group();
-          corners.forEach((c, i) => frame.add(strut(c, tops[i], 0.34, i % 2 ? beamDark : beam)));
-          tops.forEach((t, i) => frame.add(strut(t, tops[(i + 1) % 4], 0.3, beam)));
-          frame.add(strut(ridgeA, ridgeB, 0.32, beamDark));
-          frame.add(strut(tops[0], ridgeA, 0.28, beam));
-          frame.add(strut(tops[1], ridgeA, 0.28, beam));
-          frame.add(strut(tops[2], ridgeB, 0.28, beam));
-          frame.add(strut(tops[3], ridgeB, 0.28, beam));
-          frame.position.set(x, y, z);
-          frame.rotation.y = frameRot;
-          scene.add(frame);
-          const boardGeo = new THREE.BoxGeometry(3.2, 0.24, 0.7);
-          const boardMat = new THREE.MeshStandardMaterial({ color: 0xd9b26a, roughness: 1 });
-          for (let i = 0; i < 4; i++) {
-            const board = new THREE.Mesh(boardGeo, boardMat);
-            board.position.set(x + 4.4, y + 0.14 + i * 0.26, z + 1.4);
-            board.rotation.y = 0.15;
-            board.castShadow = true; board.receiveShadow = true;
-            scene.add(board);
-          }
-        }
-
-        // market: an open-sided stall, posts and a canopy, no walls, a table underneath
-        {
-          const w = 5.4, d = 4.4, postH = 2.6, stallRot = -0.5;
-          const [x, z, y] = flatSpot(18, 56, w, d, stallRot);
-          const postMat = new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 1 });
-          const stall = new THREE.Group();
-          // same trick as the frame: the canopy stays level while the legs take up the slope
-          const sc2 = Math.cos(stallRot), ssn = Math.sin(stallRot);
-          const postFoot = (lx, lz) => Math.min(0, height(x + lx * sc2 + lz * ssn, z - lx * ssn + lz * sc2) - y) - 0.1;
-          [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].forEach(([px, pz]) => {
-            const base = postFoot(px, pz), len = postH - base;
-            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, len, 7), postMat);
-            post.position.set(px, base + len / 2, pz);
-            post.castShadow = true;
-            stall.add(post);
-          });
-          const canopy = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.72, 1.6, 4), new THREE.MeshStandardMaterial({ color: 0xcf6a4a, roughness: 1 }));
-          canopy.position.y = postH + 0.7;
-          canopy.rotation.y = Math.PI / 4;
-          canopy.castShadow = true;
-          stall.add(canopy);
-          const table = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 0.9, d * 0.6), new THREE.MeshStandardMaterial({ color: 0xe6d6a4, roughness: 1 }));
-          table.position.y = 0.45;
-          table.castShadow = true; table.receiveShadow = true;
-          stall.add(table);
-          stall.position.set(x, y, z);
-          stall.rotation.y = stallRot;
-          scene.add(stall);
-        }
+      // All pre-existing buildings and the harbor share the new town kit.
+      this.town = addStrategyVillage(scene, height, AREAS.map(a => {
+        const pad = padFor(a.x, a.z);
+        return { ...a, x: pad?.x ?? a.x, z: pad?.z ?? a.z };
+      }));
+      for (const a of this.areas) {
+        const landmark = this.town.landmarks[a.id];
+        if (landmark) Object.assign(a, landmark);
       }
 
       this._frame = 0;
@@ -1181,7 +882,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
     bindInput() {
       const el = this.renderer.domElement;
       let dragging = false, px = 0, py = 0;
-      el.addEventListener("pointerdown", (e) => { dragging = true; px = e.clientX; py = e.clientY; el.setPointerCapture(e.pointerId); });
+      el.addEventListener("pointerdown", (e) => { dragging = true; this._cameraTouched = true; px = e.clientX; py = e.clientY; el.setPointerCapture(e.pointerId); });
       el.addEventListener("pointermove", (e) => {
         if (!dragging) return;
         const o = this.orbit;
@@ -1194,6 +895,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       el.addEventListener("pointercancel", stop);
       el.addEventListener("wheel", (e) => {
         e.preventDefault();
+        this._cameraTouched = true;
         const o = this.orbit;
         o.tr = Math.min(400, Math.max(48, o.tr * (1 + Math.sign(e.deltaY) * 0.09)));
       }, { passive: false });
@@ -1206,6 +908,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
       if (Math.abs(this.renderer.getPixelRatio() - want) > 0.01) this.renderer.setPixelRatio(want);
       this.renderer.setSize(w, h, false);
       this.camera.aspect = w / h;
+      if (!this._cameraTouched) this.orbit.r = this.orbit.tr = Math.min(400, 224 * Math.max(1, h / w));
       this.camera.updateProjectionMatrix();
     }
 
@@ -1454,6 +1157,7 @@ import { rand, FACE_CELL, FACE_LOOKS, FACE_COLS, HAPPY, GRIN, NEUTRAL, WORRIED, 
         this.waterUniforms.uTime.value = performance.now() * 0.001;
         this.waterUniforms.uCam.value.copy(this.camera.position);
       }
+      this.town?.update(now * 0.001);
       this.renderer.render(this.scene, this.camera);
     }
   }
